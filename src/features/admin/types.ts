@@ -1,9 +1,8 @@
-export type AdminRecordValue = string | number | boolean | string[];
-export type AdminRecord = Record<string, AdminRecordValue> & { id?: string };
+import type { BaseDocument } from '../../types';
 
 export interface AdminRepository {
-  list(collection: string, pageSize: number): Promise<AdminRecord[]>;
-  create(collection: string, data: AdminRecord): Promise<void>;
-  update(collection: string, id: string, data: AdminRecord): Promise<void>;
-  remove(collection: string, id: string): Promise<void>;
+  list: (options: { pageSize: number; cursor?: string; search?: string }) => Promise<{ items: BaseDocument[]; nextCursor?: string; hasMore: boolean }>;
+  create: (data: Omit<BaseDocument, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  update: (id: string, data: Partial<Omit<BaseDocument, 'id'>>) => Promise<void>;
+  remove: (id: string) => Promise<void>;
 }
