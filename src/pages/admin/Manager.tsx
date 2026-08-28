@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useParams } from 'react-router-dom';
 import { branches, subjects, categories } from '../../repositories';
 import type { BaseDocument } from '../../types';
@@ -48,7 +48,7 @@ export function AdminManager() {
   }
 
   function updateField(key: string, value: string | number | boolean | string[]) { setValues((current) => ({ ...current, [key]: value })); setErrors((current) => ({ ...current, [key]: '' })); }
-  function updateSelect(fieldKey: string, event: React.ChangeEvent<HTMLSelectElement>) {
+  function updateSelect(fieldKey: string, event: ChangeEvent<HTMLSelectElement>) {
     const field = cfg?.fields.find((item) => item.key === fieldKey);
     const value = field?.multiple ? Array.from(event.target.selectedOptions, (option) => option.value) : event.target.value;
     updateField(fieldKey, value);
