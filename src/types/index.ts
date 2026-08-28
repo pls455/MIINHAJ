@@ -1,7 +1,6 @@
 export type AdminRole = 'reviewer' | 'content_admin' | 'superadmin';
 export type ResourceType = 'book' | 'summary' | 'solution' | 'exam' | 'worksheet' | 'video' | 'link' | 'other';
-
-export interface BaseDocument { id: string; createdAt?: unknown; updatedAt?: unknown; }
+export interface BaseDocument { id: string; createdAt?: unknown; updatedAt?: unknown; searchNormalized?: string; }
 export interface Branch extends BaseDocument { name: string; description?: string; icon?: string; order: number; active: boolean; stableId?: string; }
 export interface Subject extends BaseDocument { name: string; description?: string; icon?: string; order: number; active: boolean; branchId?: string; branchIds?: string[]; stableId?: string; }
 export interface Category extends BaseDocument { name: string; description?: string; icon?: string; order: number; active: boolean; stableId?: string; }
@@ -16,7 +15,6 @@ export interface Contributor extends BaseDocument { name: string; description?: 
 export interface AdminUser extends BaseDocument { email: string; role: AdminRole; active: boolean; displayName?: string; permissions?: Record<string, boolean>; }
 export interface Template extends BaseDocument { name: string; entity: string; schema: Record<string, unknown>; active: boolean; }
 export interface AdminLog extends BaseDocument { actorUid: string; actorEmail?: string; role?: AdminRole; action: string; target: string; targetId?: string; metadata?: Record<string, unknown>; }
-
 export interface Page<T> { items: T[]; nextCursor?: string; hasMore: boolean; }
 export interface ListOptions { pageSize?: number; cursor?: string; search?: string; active?: boolean; branchId?: string; subjectId?: string; categoryId?: string; }
 export interface AIClassification { branchIds: string[]; subjectId: string; categoryId: string; confidence: { branch: number; subject: number; category: number }; evidence: string[]; conflicts: string[]; needsReview: boolean; }
