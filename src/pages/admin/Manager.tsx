@@ -1,6 +1,101 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { branches,subjects,categories,resources,foundations,flashcards,solutions,suggestions,problemReports,contributors,templates } from '../../repositories';
+import { branches, subjects, categories, resources, foundations, flashcards, solutions, suggestions, problemReports, contributors, templates } from '../../repositories';
 import type { BaseDocument } from '../../types';
-const repos:Record<string,{label:string;repo:{list:(o?:{pageSize?:number;cursor?:string})=>Promise<{items:BaseDocument[];nextCursor?:string;hasMore:boolean}>;create:(d:Omit<BaseDocument,'id'|'createdAt'|'updatedAt'>)=>Promise<string>;update:(id:string,d:Partial<BaseDocument>)=>Promise<void>;remove:(id:string)=>Promise<void>}}> = {branches:{label:'الفروع',repo:branches},subjects:{label:'المواد',repo:subjects},categories:{label:'التصنيفات',repo:categories},resources:{label:'المصادر',repo:resources},foundations:{label:'التأسيس',repo:foundations},flashcards:{label:'البطاقات',repo:flashcards},solutions:{label:'الحلول',repo:solutions},suggestions:{label:'الاقتراحات',repo:suggestions},problemReports:{label:'البلاغات',repo:problemReports},contributors:{label:'المساهمون',repo:contributors},templates:{label:'القوالب',repo:templates}};
-export function AdminManager(){const {domain='resources'}=useParams();const cfg=repos[domain];const [items,setItems]=useState<BaseDocument[]>([]),[cursor,setCursor]=useState<string>(),[more,setMore]=useState(false),[loading,setLoading]=useState(true),[title,setTitle]=useState(''),[description,setDescription]=useState(''),[url,setUrl]=useState(''),[editing,setEditing]=useState<string|null>(null),[active,setActive]=useState(true);useEffect(()=>{setItems([]);setCursor(undefined);void load(true)},[domain]);async function load(reset=false){if(!cfg)return;setLoading(true);try{const p=await cfg.repo.list({pageSize:20,cursor:reset?undefined:cursor});setItems(reset?p.items:[...items,...p.items]);setCursor(p.nextCursor);setMore(p.hasMore)}finally{setLoading(false)}}async function submit(e:FormEvent){e.preventDefault();if(!cfg||!title.trim())return;const payload={title:title.trim(),description:description.trim(),url:url.trim()||undefined,active,order:0};if(editing)await cfg.repo.update(editing,payload);else await cfg.repo.create(payload as Omit<BaseDocument,'id'|'createdAt'|'updatedAt'>);setEditing(null);setTitle('');setDescription('');setUrl('');await load(true)}function edit(x:BaseDocument){const r=x as BaseDocument&Record<string,unknown>;setEditing(x.id);setTitle(String(r.title??r.name??''));setDescription(String(r.description??r.content??''));setUrl(String(r.url??''));setActive(Boolean(r.active??true));window.scrollTo({top:0,behavior:'smooth'})}if(!cfg)return <section><h1>القسم غير موجود</h1></section>;return <section><div className="page-head"><h1>{cfg.label}</h1></div><form className="card form" onSubmit={submit}><h2>{editing?'تعديل':'إضافة'} {cfg.label}</h2><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="الاسم / العنوان" required maxLength={200}/><textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="الوصف أو المحتوى" maxLength={3000}/><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="الرابط (اختياري)" type="url"/><label><input type="checkbox" checked={active} onChange={e=>setActive(e.target.checked)}/> فعال</label><div className="actions"><button className="button" disabled={loading}>{editing?'حفظ التعديل':'إضافة'}</button>{editing&&<button type="button" onClick={()=>{setEditing(null);setTitle('');setDescription('');setUrl('')}}>إلغاء</button>}</div></form><div className="list">{items.map(x=><article className="card row" key={x.id}><div><h2>{String((x as Record<string,unknown>).title??(x as Record<string,unknown>).name??x.id)}</h2><p>{String((x as Record<string,unknown>).description??'')}</p></div><div className="actions"><button onClick={()=>edit(x)}>تعديل</button><button className="danger" onClick={async()=>{if(confirm('حذف هذا العنصر؟')){await cfg.repo.remove(x.id);await load(true)}}}>حذف</button></div></article>)}</div>{loading&&<p>جارٍ التحميل...</p>}{more&&!loading&&<button className="button" onClick={()=>void load()}>تحميل المزيد</button>}</section>}
+import { ADMIN_ENTITIES, type AdminEntityDefinition } from '../../features/admin/managerConfig';
+import { createEmptyForm, createFormFromDocument, toFirestoreValues, type AdminFormValues } from '../../features/admin/entityForm';
+import { validateAdminForm } from '../../features/admin/managerValidation';
+
+type Repository = typeof branches;
+const repos: Record<string, Repository> = { branches, subjects, categories, resources, foundations, flashcards, solutions, suggestions, problemReports, contributors, templates };
+
+export function AdminManager() {
+  const { domain = 'resources' } = useParams();
+  const cfg = useMemo<AdminEntityDefinition | undefined>(() => ADMIN_ENTITIES.find((item) => item.id === domain), [domain]);
+  const repo = domain ? repos[domain] : undefined;
+  const [items, setItems] = useState<BaseDocument[]>([]);
+  const [cursor, setCursor] = useState<string>();
+  const [more, setMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [editing, setEditing] = useState<string | null>(null);
+  const [values, setValues] = useState<AdminFormValues>(() => cfg ? createEmptyForm(cfg.fields) : {});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!cfg || !repo) return;
+    setItems([]); setCursor(undefined); setMore(false); setEditing(null); setValues(createEmptyForm(cfg.fields)); setErrors({});
+    void load(true);
+  }, [domain]);
+
+  async function load(reset = false) {
+    if (!repo) return;
+    setLoading(true); setError('');
+    try {
+      const page = await repo.list({ pageSize: 20, cursor: reset ? undefined : cursor });
+      setItems((current) => reset ? page.items : [...current, ...page.items]);
+      setCursor(page.nextCursor); setMore(page.hasMore);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'تعذر تحميل البيانات.');
+    } finally { setLoading(false); }
+  }
+
+  function updateField(key: string, value: string | number | boolean) {
+    setValues((current) => ({ ...current, [key]: value }));
+    setErrors((current) => ({ ...current, [key]: '' }));
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault(); if (!repo || !cfg) return;
+    const validation = validateAdminForm(cfg.fields, values);
+    if (Object.keys(validation).length) { setErrors(validation); return; }
+    setSaving(true); setError('');
+    try {
+      const payload = toFirestoreValues(cfg.fields, values);
+      if (editing) await repo.update(editing, payload);
+      else await repo.create(payload as Omit<BaseDocument, 'id' | 'createdAt' | 'updatedAt'>);
+      cancelEdit(); await load(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'تعذر حفظ البيانات.');
+    } finally { setSaving(false); }
+  }
+
+  function startEdit(item: BaseDocument) {
+    if (!cfg) return;
+    setEditing(item.id); setValues(createFormFromDocument(cfg.fields, item as unknown as Record<string, unknown>)); setErrors({}); setError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function cancelEdit() { if (cfg) setValues(createEmptyForm(cfg.fields)); setEditing(null); setErrors({}); }
+
+  async function remove(id: string) {
+    if (!repo || !window.confirm('حذف هذا العنصر؟ لا يمكن التراجع عن العملية.')) return;
+    setError('');
+    try { await repo.remove(id); await load(true); } catch (e) { setError(e instanceof Error ? e.message : 'تعذر حذف العنصر.'); }
+  }
+
+  const filtered = search.trim() ? items.filter((item) => JSON.stringify(item).toLocaleLowerCase('ar').includes(search.trim().toLocaleLowerCase('ar'))) : items;
+  if (!cfg || !repo) return <section><h1>القسم غير موجود</h1></section>;
+
+  return <section>
+    <div className="page-head"><h1>{cfg.label}</h1><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث في الصفحة الحالية..." aria-label={`بحث في ${cfg.label}`} /></div>
+    {error && <div className="card error" role="alert">{error}</div>}
+    <form className="card form" onSubmit={submit} noValidate>
+      <h2>{editing ? 'تعديل' : 'إضافة'} {cfg.label}</h2>
+      {cfg.fields.map((field) => <label key={field.key}>
+        {field.label}{field.required ? ' *' : ''}
+        {field.type === 'textarea' ? <textarea value={String(values[field.key] ?? '')} onChange={(e) => updateField(field.key, e.target.value)} maxLength={5000} aria-invalid={Boolean(errors[field.key])} /> : field.type === 'checkbox' ? <input type="checkbox" checked={Boolean(values[field.key])} onChange={(e) => updateField(field.key, e.target.checked)} /> : <input type={field.type} value={String(values[field.key] ?? '')} onChange={(e) => updateField(field.key, field.type === 'number' ? e.target.value : e.target.value)} required={field.required} maxLength={field.type === 'text' ? 500 : undefined} aria-invalid={Boolean(errors[field.key])} placeholder={field.placeholder} />}
+        {errors[field.key] && <small role="alert">{errors[field.key]}</small>}
+      </label>)}
+      <div className="actions"><button className="button" disabled={saving || loading}>{saving ? 'جارٍ الحفظ...' : editing ? 'حفظ التعديل' : 'إضافة'}</button>{editing && <button type="button" onClick={cancelEdit}>إلغاء</button>}</div>
+    </form>
+    <div className="list" aria-busy={loading}>
+      {filtered.map((item) => { const row = item as BaseDocument & Record<string, unknown>; return <article className="card row" key={item.id}><div><h2>{String(row.title ?? row.name ?? item.id)}</h2><p>{String(row.description ?? row.content ?? '')}</p></div><div className="actions"><button onClick={() => startEdit(item)}>تعديل</button><button className="danger" onClick={() => void remove(item.id)}>حذف</button></div></article>; })}
+      {!loading && !filtered.length && <p className="empty">لا توجد بيانات.</p>}
+    </div>
+    {loading && <p>جارٍ التحميل...</p>}
+    {more && !loading && <button className="button" onClick={() => void load()}>تحميل المزيد</button>}
+  </section>;
+}
