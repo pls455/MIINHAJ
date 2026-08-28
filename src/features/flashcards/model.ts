@@ -1,8 +1,15 @@
-export interface FlashcardProgress { knownIds: string[]; reviewedIds: string[]; }
+export interface FlashcardProgress {
+  knownIds: string[];
+  reviewedIds: string[];
+}
 
 export function toggleKnown(progress: FlashcardProgress, id: string, known: boolean): FlashcardProgress {
   const ids = new Set(progress.knownIds);
-  known ? ids.add(id) : ids.delete(id);
+  if (known) {
+    ids.add(id);
+  } else {
+    ids.delete(id);
+  }
   return { ...progress, knownIds: [...ids] };
 }
 
