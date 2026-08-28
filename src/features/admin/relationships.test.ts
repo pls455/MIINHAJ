@@ -20,7 +20,10 @@ describe('validateRelationshipIds', () => {
   });
 
   it('rejects an unknown legacy branchId', () => {
-    expect(validateRelationshipIds({ branchId: 'missing' }, options)).toEqual({ branchId: 'الفرع المحدد غير موجود.' });
+    expect(validateRelationshipIds({ branchId: 'missing' }, options)).toEqual({
+      branchId: 'الفرع المحدد غير موجود.',
+      branchIds: 'الفرع المحدد غير موجود.',
+    });
   });
 
   it('rejects an unknown branchId inside branchIds', () => {
@@ -40,7 +43,7 @@ describe('validateRelationshipIds', () => {
 
   it('rejects invalid subject and category ids', () => {
     expect(validateRelationshipIds({ subjectId: 'missing-subject', categoryId: 'missing-category' }, options)).toEqual({
-      subjectId: 'المادة المحددة غير موجودة.',
+      subjectId: 'المادة المحدد غير موجود.',
       categoryId: 'التصنيف المحدد غير موجود.',
     });
   });
