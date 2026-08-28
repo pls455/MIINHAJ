@@ -3,7 +3,7 @@ import type { Permission } from '../../app/permissions';
 export interface AdminFieldDefinition {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'url' | 'number' | 'checkbox';
+  type: 'text' | 'textarea' | 'url' | 'number' | 'checkbox' | 'select';
   required?: boolean;
   placeholder?: string;
 }
@@ -17,47 +17,16 @@ export interface AdminEntityDefinition {
 }
 
 export const ADMIN_ENTITIES: readonly AdminEntityDefinition[] = [
-  { id: 'branches', collection: 'branches', label: 'الفروع', permission: 'manageBranches', fields: [
-    { key: 'name', label: 'الاسم', type: 'text', required: true },
-    { key: 'description', label: 'الوصف', type: 'textarea' },
-    { key: 'icon', label: 'الأيقونة', type: 'text' },
-    { key: 'order', label: 'الترتيب', type: 'number' },
-    { key: 'active', label: 'نشط', type: 'checkbox' },
-  ] },
-  { id: 'subjects', collection: 'subjects', label: 'المواد', permission: 'manageSubjects', fields: [
-    { key: 'name', label: 'اسم المادة', type: 'text', required: true },
-    { key: 'description', label: 'الوصف', type: 'textarea' },
-    { key: 'icon', label: 'الأيقونة', type: 'text' },
-    { key: 'order', label: 'الترتيب', type: 'number' },
-    { key: 'active', label: 'نشط', type: 'checkbox' },
-  ] },
-  { id: 'categories', collection: 'categories', label: 'التصنيفات', permission: 'manageCategories', fields: [
-    { key: 'name', label: 'اسم التصنيف', type: 'text', required: true },
-    { key: 'description', label: 'الوصف', type: 'textarea' },
-    { key: 'order', label: 'الترتيب', type: 'number' },
-    { key: 'active', label: 'نشط', type: 'checkbox' },
-  ] },
-  { id: 'resources', collection: 'resources', label: 'المصادر', permission: 'manageResources', fields: [
-    { key: 'title', label: 'العنوان', type: 'text', required: true },
-    { key: 'description', label: 'الوصف', type: 'textarea' },
-    { key: 'url', label: 'الرابط', type: 'url', required: true },
-    { key: 'type', label: 'النوع', type: 'text', required: true },
-    { key: 'order', label: 'الترتيب', type: 'number' },
-    { key: 'active', label: 'نشط', type: 'checkbox' },
-  ] },
-  { id: 'foundations', collection: 'foundations', label: 'التأسيس', permission: 'manageFoundations', fields: [
-    { key: 'title', label: 'العنوان', type: 'text', required: true },
-    { key: 'description', label: 'الوصف', type: 'textarea' },
-    { key: 'url', label: 'الرابط', type: 'url' },
-    { key: 'order', label: 'الترتيب', type: 'number' },
-    { key: 'active', label: 'نشط', type: 'checkbox' },
-  ] },
-  { id: 'solutions', collection: 'solutions', label: 'الحلول', permission: 'manageSolutions', fields: [
-    { key: 'title', label: 'العنوان', type: 'text', required: true },
-    { key: 'category', label: 'التصنيف', type: 'text' },
-    { key: 'content', label: 'المحتوى', type: 'textarea', required: true },
-    { key: 'links', label: 'الروابط', type: 'textarea' },
-    { key: 'order', label: 'الترتيب', type: 'number' },
-    { key: 'active', label: 'نشط', type: 'checkbox' },
-  ] },
+  { id:'branches', collection:'branches', label:'الفروع', permission:'manageBranches', fields:[
+    {key:'name',label:'الاسم',type:'text',required:true},{key:'description',label:'الوصف',type:'textarea'},{key:'icon',label:'الأيقونة',type:'text'},{key:'order',label:'الترتيب',type:'number'},{key:'active',label:'نشط',type:'checkbox'}]},
+  { id:'subjects', collection:'subjects', label:'المواد', permission:'manageSubjects', fields:[
+    {key:'name',label:'اسم المادة',type:'text',required:true},{key:'description',label:'الوصف',type:'textarea'},{key:'icon',label:'الأيقونة',type:'text'},{key:'order',label:'الترتيب',type:'number'},{key:'active',label:'نشط',type:'checkbox'}]},
+  { id:'categories', collection:'categories', label:'التصنيفات', permission:'manageCategories', fields:[
+    {key:'name',label:'اسم التصنيف',type:'text',required:true},{key:'description',label:'الوصف',type:'textarea'},{key:'order',label:'الترتيب',type:'number'},{key:'active',label:'نشط',type:'checkbox'}]},
+  { id:'resources', collection:'resources', label:'المصادر', permission:'manageResources', fields:[
+    {key:'title',label:'العنوان',type:'text',required:true},{key:'description',label:'الوصف',type:'textarea'},{key:'url',label:'الرابط',type:'url',required:true},{key:'type',label:'النوع',type:'text',required:true},{key:'branchId',label:'معرّف الفرع',type:'text'},{key:'subjectId',label:'معرّف المادة',type:'text'},{key:'categoryId',label:'معرّف التصنيف',type:'text'},{key:'order',label:'الترتيب',type:'number'},{key:'active',label:'نشط',type:'checkbox'}]},
+  { id:'foundations', collection:'foundations', label:'التأسيس', permission:'manageFoundations', fields:[
+    {key:'title',label:'العنوان',type:'text',required:true},{key:'description',label:'الوصف',type:'textarea'},{key:'url',label:'الرابط',type:'url'},{key:'order',label:'الترتيب',type:'number'},{key:'active',label:'نشط',type:'checkbox'}]},
+  { id:'solutions', collection:'solutions', label:'الحلول', permission:'manageSolutions', fields:[
+    {key:'title',label:'العنوان',type:'text',required:true},{key:'category',label:'التصنيف',type:'text'},{key:'content',label:'المحتوى',type:'textarea',required:true},{key:'links',label:'الروابط',type:'textarea'},{key:'order',label:'الترتيب',type:'number'},{key:'active',label:'نشط',type:'checkbox'}]}
 ] as const;
