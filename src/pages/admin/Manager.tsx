@@ -1,14 +1,13 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { branches, subjects, categories, resources, foundations, flashcards, solutions, suggestions, problemReports, contributors, templates } from '../../repositories';
+import { branches, subjects, categories } from '../../repositories';
 import type { BaseDocument } from '../../types';
 import { ADMIN_ENTITIES, type AdminEntityDefinition } from '../../features/admin/managerConfig';
 import { createEmptyForm, createFormFromDocument, toFirestoreValues, type AdminFormValues } from '../../features/admin/entityForm';
 import { validateAdminForm } from '../../features/admin/managerValidation';
 import { validateRelationshipIds } from '../../features/admin/relationships';
+import { adminRepositories } from '../../features/admin/adminRepositoryMap';
 
-type Repository = typeof branches;
-const repos: Record<string, Repository> = { branches, subjects, categories, resources, foundations, flashcards, solutions, suggestions, problemReports, contributors, templates };
 type RelationshipOption = { id: string; label: string; active?: boolean };
 type RelationState = { branches: RelationshipOption[]; subjects: RelationshipOption[]; categories: RelationshipOption[] };
 const EMPTY_RELATIONS: RelationState = { branches: [], subjects: [], categories: [] };
@@ -16,16 +15,16 @@ const EMPTY_RELATIONS: RelationState = { branches: [], subjects: [], categories:
 export function AdminManager() {
   const { domain = 'resources' } = useParams();
   const cfg = useMemo<AdminEntityDefinition | undefined>(() => ADMIN_ENTITIES.find((item) => item.id === domain), [domain]);
-  const repo = domain ? repos[domain] : undefined;
+  const repo = domain ? adminRepositories[domain] : undefined;
   const [items, setItems] = useState<BaseDocument[]>([]); const [cursor, setCursor] = useState<string>(); const [more, setMore] = useState(false);
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [relationsLoading, setRelationsLoading] = useState(false);
   const [search, setSearch] = useState(''); const [editing, setEditing] = useState<string | null>(null); const [values, setValues] = useState<AdminFormValues>(() => cfg ? createEmptyForm(cfg.fields) : {});
   const [errors, setErrors] = useState<Record<string, string>>({}); const [error, setError] = useState(''); const [relations, setRelations] = useState<RelationState>(EMPTY_RELATIONS);
 
-  useEffect(() => { if (!cfg || !repo) return; setItems([]); setCursor(undefined); setMore(false); setEditing(null); setSearch(''); setValues(createEmptyForm(cfg.fields)); setErrors({}); void load(true, ''); }, [domain]);
+  useEffect(() => { if (!cfg || !repo) return; setItems([]); setCursor(undefined); setMore(false); setEditing(null); setSearch(''); setValues(createEmptyForm(cfg.fields)); setErrors({}); void load(true, ''); }, [domain, cfg, repo]);
 
   useEffect(() => {
-    if (domain !== 'resources') return;
+    if (!domain || !['resources', 'subjects'].includes(domain)) return;
     let cancelled = false; setRelationsLoading(true);
     Promise.all([branches.list({ pageSize: 100 }), subjects.list({ pageSize: 100 }), categories.list({ pageSize: 100 })])
       .then(([b, s, c]) => { if (cancelled) return; const map = (page: { items: BaseDocument[] }): RelationshipOption[] => page.items.map((item) => { const r = item as BaseDocument & Record<string, unknown>; return { id: item.id, label: String(r.name ?? r.title ?? item.id), active: r.active === undefined ? true : Boolean(r.active) }; }); setRelations({ branches: map(b), subjects: map(s), categories: map(c) }); })
@@ -38,7 +37,7 @@ export function AdminManager() {
     if (!repo || !cfg || !search.trim()) return;
     const timer = window.setTimeout(() => { void load(true, search); }, 300);
     return () => window.clearTimeout(timer);
-  }, [search, domain]);
+  }, [search, domain, repo, cfg]);
 
   async function load(reset = false, requestedSearch = search) {
     if (!repo) return;
@@ -51,7 +50,7 @@ export function AdminManager() {
   }
 
   function updateField(key: string, value: string | number | boolean) { setValues((current) => ({ ...current, [key]: value })); setErrors((current) => ({ ...current, [key]: '' })); }
-  async function submit(event: FormEvent) { event.preventDefault(); if (!repo || !cfg) return; const validation = validateAdminForm(cfg.fields, values); const relationshipErrors = domain === 'resources' ? validateRelationshipIds({ branchId: String(values.branchId ?? ''), subjectId: String(values.subjectId ?? ''), categoryId: String(values.categoryId ?? '') }, relations) : {}; const allErrors = { ...validation, ...relationshipErrors }; if (Object.keys(allErrors).length) { setErrors(allErrors); return; } setSaving(true); setError(''); try { const payload = toFirestoreValues(cfg.fields, values); if (editing) await repo.update(editing, payload); else await repo.create(payload as Omit<BaseDocument, 'id' | 'createdAt' | 'updatedAt'>); cancelEdit(); await load(true, search); } catch (e) { setError(e instanceof Error ? e.message : 'تعذر حفظ البيانات.'); } finally { setSaving(false); } }
+  async function submit(event: FormEvent) { event.preventDefault(); if (!repo || !cfg) return; const validation = validateAdminForm(cfg.fields, values); const relationshipErrors = domain === 'resources' ? validateRelationshipIds({ branchId: String(values.branchId ?? ''), subjectId: String(values.subjectId ?? ''), categoryId: String(values.categoryId ?? '') }, relations) : {}; const allErrors = { ...validation, ...relationshipErrors }; if (Object.keys(allErrors).length) { setErrors(allErrors); return; } setSaving(true); setError(''); try { const payload = toFirestoreValues(cfg.fields, values); if (editing) await repo.update(editing, payload); else await repo.create(payload); cancelEdit(); await load(true, search); } catch (e) { setError(e instanceof Error ? e.message : 'تعذر حفظ البيانات.'); } finally { setSaving(false); } }
   function startEdit(item: BaseDocument) { if (!cfg) return; setEditing(item.id); setValues(createFormFromDocument(cfg.fields, item as unknown as Record<string, unknown>)); setErrors({}); setError(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   function cancelEdit() { if (cfg) setValues(createEmptyForm(cfg.fields)); setEditing(null); setErrors({}); }
   async function remove(id: string) { if (!repo || !window.confirm('حذف هذا العنصر؟ لا يمكن التراجع عن العملية.')) return; try { await repo.remove(id); await load(true, search); } catch (e) { setError(e instanceof Error ? e.message : 'تعذر حذف العنصر.'); } }
