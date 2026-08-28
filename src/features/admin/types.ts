@@ -1,8 +1,8 @@
-import type { BaseDocument } from '../../types';
+import type { BaseDocument, ListOptions, Page } from '../../types';
 
 export interface AdminRepository {
-  list: (options: { pageSize: number; cursor?: string; search?: string }) => Promise<{ items: BaseDocument[]; nextCursor?: string; hasMore: boolean }>;
-  create: (data: Omit<BaseDocument, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
-  update: (id: string, data: Partial<Omit<BaseDocument, 'id'>>) => Promise<void>;
+  list: (options?: ListOptions) => Promise<Page<BaseDocument>>;
+  create: (data: Record<string, unknown>) => Promise<string>;
+  update: (id: string, data: Record<string, unknown>) => Promise<void>;
   remove: (id: string) => Promise<void>;
 }
