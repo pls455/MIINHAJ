@@ -1,0 +1,16 @@
+{
+  "indexes": [
+    { "collectionGroup": "resources", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "searchNormalized", "order": "ASCENDING" }] },
+    { "collectionGroup": "subjects", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "searchNormalized", "order": "ASCENDING" }] },
+    { "collectionGroup": "branches", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "searchNormalized", "order": "ASCENDING" }] },
+    { "collectionGroup": "categories", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "searchNormalized", "order": "ASCENDING" }] },
+    { "collectionGroup": "foundations", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "searchNormalized", "order": "ASCENDING" }] },
+    { "collectionGroup": "flashcards", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "searchNormalized", "order": "ASCENDING" }] },
+    { "collectionGroup": "solutions", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "searchNormalized", "order": "ASCENDING" }] },
+    { "collectionGroup": "suggestions", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "searchNormalized", "order": "ASCENDING" }] },
+    { "collectionGroup": "problemReports", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "searchNormalized", "order": "ASCENDING" }] },
+    { "collectionGroup": "contributors", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "searchNormalized", "order": "ASCENDING" }] },
+    { "collectionGroup": "templates", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "searchNormalized", "order": "ASCENDING" }] }
+  ],
+  "fieldOverrides": []
+}
