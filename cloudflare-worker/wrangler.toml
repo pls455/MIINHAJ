@@ -1,0 +1,9 @@
+name = "minhaj-api"
+main = "src/index.ts"
+compatibility_date = "2026-08-28"
+
+[vars]
+GEMINI_MODEL = "gemini-2.5-flash"
+
+# Secrets are configured with: wrangler secret put GEMINI_API_KEY
+# Never commit provider credentials.

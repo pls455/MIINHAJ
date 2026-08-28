@@ -1,0 +1,5 @@
+{
+  "files": [],
+  "references": [{"path":"./tsconfig.app.json"},{"path":"./tsconfig.node.json"}],
+  "compilerOptions": {"module":"ESNext","moduleResolution":"Bundler","allowImportingTsExtensions":true,"verbatimModuleSyntax":true,"moduleDetection":"force","skipLibCheck":true,"noEmit":true}
+}

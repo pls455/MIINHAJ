@@ -1,0 +1,39 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../app/AuthProvider';
+import { branches, subjects, categories, resources, foundations, flashcards, solutions, suggestions, problemReports, contributors, admins, templates, adminLogs } from '../../repositories';
+
+const domains = [
+  ['branches', 'الفروع', branches], ['subjects', 'المواد', subjects], ['categories', 'التصنيفات', categories],
+  ['resources', 'المصادر', resources], ['foundations', 'التأسيس', foundations], ['flashcards', 'البطاقات', flashcards],
+  ['solutions', 'الحلول', solutions], ['suggestions', 'الاقتراحات', suggestions], ['problemReports', 'البلاغات', problemReports],
+  ['contributors', 'المساهمون', contributors], ['templates', 'القوالب', templates], ['admins', 'المدراء', admins], ['adminLogs', 'السجلات', adminLogs],
+] as const;
+
+export function AdminDashboard() {
+  const { admin, signOut } = useAuth();
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let live = true;
+    Promise.all(domains.map(async ([key, , repo]) => [key, await repo.count()] as const))
+      .then((values) => { if (live) setCounts(Object.fromEntries(values)); })
+      .catch(() => { if (live) setError('تعذر تحميل إحصائيات لوحة التحكم.'); });
+    return () => { live = false; };
+  }, []);
+
+  return <section>
+    <div className="page-head">
+      <div><span className="eyebrow">ADMIN</span><h1>لوحة التحكم</h1><p>{admin?.displayName || admin?.email} · {admin?.role}</p></div>
+      <button className="button secondary" onClick={() => void signOut()}>خروج</button>
+    </div>
+    {error && <div className="error" role="alert">{error}</div>}
+    <div className="admin-grid">
+      {domains.map(([key, label]) => <Link className="card" to={`/admin/${key}`} key={key}><h2>{label}</h2><strong>{counts[key] ?? '…'}</strong></Link>)}
+      <Link className="card" to="/admin/drive"><h2>Google Drive</h2><strong>→</strong></Link>
+      <Link className="card" to="/admin/ai"><h2>AI</h2><strong>→</strong></Link>
+      <Link className="card" to="/admin/settings"><h2>الإعدادات</h2><strong>→</strong></Link>
+    </div>
+  </section>;
+}

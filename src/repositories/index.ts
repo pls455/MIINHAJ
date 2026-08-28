@@ -1,0 +1,15 @@
+import type { Branch, Subject, Category, Resource, Foundation, Flashcard, Solution, Suggestion, ProblemReport, Contributor, AdminUser, Template, AdminLog } from '../types';
+import { createRepository } from './createRepository';
+export const branches = createRepository<Branch>('branches');
+export const subjects = createRepository<Subject>('subjects');
+export const categories = createRepository<Category>('categories');
+export const resources = createRepository<Resource>('resources');
+export const foundations = createRepository<Foundation>('foundations');
+export const flashcards = createRepository<Flashcard>('flashcards');
+export const solutions = createRepository<Solution>('solutions');
+export const suggestions = createRepository<Suggestion>('suggestions');
+export const problemReports = createRepository<ProblemReport>('problemReports');
+export const contributors = createRepository<Contributor>('contributors');
+export const admins = createRepository<AdminUser>('admins');
+export const templates = createRepository<Template>('templates');
+export const adminLogs = createRepository<AdminLog>('adminLogs');

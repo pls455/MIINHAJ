@@ -1,0 +1,122 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function adminDoc() {
+      return signedIn()
+        ? get(/databases/$(database)/documents/admins/$(request.auth.uid))
+        : null;
+    }
+
+    function activeAdmin() {
+      return signedIn()
+        && adminDoc() != null
+        && adminDoc().data.active == true;
+    }
+
+    function roleAtLeast(role) {
+      return activeAdmin() && (
+        (role == 'reviewer' && adminDoc().data.role in ['reviewer', 'content_admin', 'superadmin']) ||
+        (role == 'content_admin' && adminDoc().data.role in ['content_admin', 'superadmin']) ||
+        (role == 'superadmin' && adminDoc().data.role == 'superadmin')
+      );
+    }
+
+    function validSubmission(fields) {
+      return request.resource.data.keys().hasOnly(fields)
+        && request.resource.data.type is string
+        && request.resource.data.type.size() > 0
+        && request.resource.data.type.size() <= 40
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time;
+    }
+
+    // Admin accounts are self-readable, but only superadmins can enumerate
+    // or modify the admin directory. Deletes remain disabled to preserve auditability.
+    match /admins/{uid} {
+      allow get: if signedIn() && (uid == request.auth.uid || roleAtLeast('superadmin'));
+      allow list, create, update: if roleAtLeast('superadmin');
+      allow delete: if false;
+    }
+
+    // Public content is readable only when explicitly active. Reviewers can
+    // inspect inactive records; writes are restricted to the owning role.
+    match /branches/{id} {
+      allow read: if resource.data.active == true || roleAtLeast('reviewer');
+      allow create, update, delete: if roleAtLeast('superadmin');
+    }
+    match /subjects/{id} {
+      allow read: if resource.data.active == true || roleAtLeast('reviewer');
+      allow create, update, delete: if roleAtLeast('content_admin');
+    }
+    match /categories/{id} {
+      allow read: if resource.data.active == true || roleAtLeast('reviewer');
+      allow create, update, delete: if roleAtLeast('content_admin');
+    }
+    match /resources/{id} {
+      allow read: if resource.data.active == true || roleAtLeast('reviewer');
+      allow create, update, delete: if roleAtLeast('content_admin');
+    }
+    match /foundations/{id} {
+      allow read: if resource.data.active == true || roleAtLeast('reviewer');
+      allow create, update, delete: if roleAtLeast('content_admin');
+    }
+    match /flashcards/{id} {
+      allow read: if resource.data.active == true || roleAtLeast('reviewer');
+      allow create, update, delete: if roleAtLeast('content_admin');
+    }
+    match /solutions/{id} {
+      allow read: if resource.data.active == true || roleAtLeast('reviewer');
+      allow create, update, delete: if roleAtLeast('content_admin');
+    }
+    match /contributors/{id} {
+      allow read: if resource.data.active == true || roleAtLeast('reviewer');
+      allow create, update, delete: if roleAtLeast('content_admin');
+    }
+    match /templates/{id} {
+      allow read: if roleAtLeast('reviewer');
+      allow create, update, delete: if roleAtLeast('content_admin');
+    }
+
+    // Public submissions may only be created as pending records with a
+    // deliberately small, allow-listed shape. Review actions are admin-only.
+    match /suggestions/{id} {
+      allow create: if validSubmission(['type', 'title', 'description', 'url', 'status', 'createdAt'])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 2
+        && request.resource.data.title.size() <= 200
+        && (!request.resource.data.keys().hasAny(['description']) || request.resource.data.description is string)
+        && (!request.resource.data.keys().hasAny(['description']) || request.resource.data.description.size() <= 2000)
+        && (!request.resource.data.keys().hasAny(['url']) || request.resource.data.url is string)
+        && (!request.resource.data.keys().hasAny(['url']) || request.resource.data.url.size() <= 1000);
+      allow read, update: if roleAtLeast('reviewer');
+      allow delete: if false;
+    }
+
+    match /problemReports/{id} {
+      allow create: if validSubmission(['type', 'title', 'description', 'status', 'createdAt'])
+        && request.resource.data.description is string
+        && request.resource.data.description.size() >= 5
+        && request.resource.data.description.size() <= 2000
+        && (!request.resource.data.keys().hasAny(['title']) || request.resource.data.title is string)
+        && (!request.resource.data.keys().hasAny(['title']) || request.resource.data.title.size() <= 200);
+      allow read, update: if roleAtLeast('reviewer');
+      allow delete: if roleAtLeast('content_admin');
+    }
+
+    // Logs are append-only from the application perspective.
+    match /adminLogs/{id} {
+      allow read: if roleAtLeast('superadmin');
+      allow create: if roleAtLeast('reviewer');
+      allow update, delete: if false;
+    }
+
+    // Deny every collection that has not been explicitly declared above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
