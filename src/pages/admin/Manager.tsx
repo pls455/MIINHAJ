@@ -56,7 +56,7 @@ export function AdminManager() {
   async function submit(event: FormEvent) {
     event.preventDefault(); if (!repo || !cfg) return;
     const validation = validateAdminForm(cfg.fields, values);
-    const relationshipErrors = domain === 'resources' ? validateRelationshipIds({ branchId: String(values.branchId ?? ''), subjectId: String(values.subjectId ?? ''), categoryId: String(values.categoryId ?? '') }, relations) : {};
+    const relationshipErrors = domain === 'resources' ? validateRelationshipIds({ branchId: typeof values.branchId === 'string' ? values.branchId : undefined, branchIds: Array.isArray(values.branchIds) ? values.branchIds.filter((id): id is string => typeof id === 'string') : undefined, subjectId: typeof values.subjectId === 'string' ? values.subjectId : undefined, categoryId: typeof values.categoryId === 'string' ? values.categoryId : undefined }, relations) : {};
     const allErrors = { ...validation, ...relationshipErrors }; if (Object.keys(allErrors).length) { setErrors(allErrors); return; }
     setSaving(true); setError('');
     try { const payload = toFirestoreValues(cfg.fields, values); if (editing) await repo.update(editing, payload); else await repo.create(payload); cancelEdit(); await load(true, search); }
