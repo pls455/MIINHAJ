@@ -72,7 +72,7 @@ export function ManagerPage({ repository, canManage, relationOptions }: ManagerP
         setError(`الحقل مطلوب: ${field.label}`);
         return;
       }
-      if (field.type === 'url' && form[field.key] && !/^https?:\\/\\//i.test(String(form[field.key]))) {
+      if (field.type === 'url' && form[field.key] && !/^https?:\/\//i.test(String(form[field.key]))) {
         setError(`الرابط غير صالح: ${field.label}`);
         return;
       }
