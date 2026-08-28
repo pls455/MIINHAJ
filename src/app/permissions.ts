@@ -9,21 +9,26 @@ export type Permission =
   | 'manageSuggestions'
   | 'manageProblemReports'
   | 'manageContributors'
-  | 'manageTemplates';
+  | 'manageTemplates'
+  | 'manageAdmins'
+  | 'manageLogs'
+  | 'manageSettings'
+  | 'manageDrive'
+  | 'manageAI';
 
 export type AdminRole = 'reviewer' | 'content_admin' | 'superadmin';
 
+const CONTENT_PERMISSIONS: readonly Permission[] = [
+  'manageSubjects', 'manageCategories', 'manageResources', 'manageFoundations',
+  'manageFlashcards', 'manageSolutions', 'manageContributors', 'manageTemplates',
+];
+
 const ROLE_PERMISSIONS: Record<AdminRole, readonly Permission[]> = {
-  reviewer: ['manageSuggestions', 'manageProblemReports'],
-  content_admin: [
-    'manageBranches', 'manageSubjects', 'manageCategories', 'manageResources',
-    'manageFoundations', 'manageFlashcards', 'manageSolutions', 'manageContributors', 'manageTemplates',
-    'manageSuggestions', 'manageProblemReports',
-  ],
+  reviewer: ['manageSuggestions', 'manageProblemReports', 'manageLogs'],
+  content_admin: [...CONTENT_PERMISSIONS, 'manageSuggestions', 'manageProblemReports', 'manageDrive', 'manageAI'],
   superadmin: [
-    'manageBranches', 'manageSubjects', 'manageCategories', 'manageResources',
-    'manageFoundations', 'manageFlashcards', 'manageSolutions', 'manageSuggestions',
-    'manageProblemReports', 'manageContributors', 'manageTemplates',
+    'manageBranches', ...CONTENT_PERMISSIONS, 'manageSuggestions', 'manageProblemReports',
+    'manageContributors', 'manageTemplates', 'manageAdmins', 'manageLogs', 'manageSettings', 'manageDrive', 'manageAI',
   ],
 };
 
