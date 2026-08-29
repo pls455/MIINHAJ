@@ -2,26 +2,46 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function adminRef(uid) { return /databases/$(database)/documents/admins/$(uid); }
-    function isActiveAdmin() { return signedIn() && exists(adminRef(request.auth.uid)) && get(adminRef(request.auth.uid)).data.active == true; }
-    function role() { return isActiveAdmin() ? get(adminRef(request.auth.uid)).data.role : ''; }
-    function reviewer() { return isActiveAdmin() && (role() == 'reviewer' || role() == 'content_admin' || role() == 'superadmin' || role() == 'super_admin' || role() == 'admin'); }
-    function contentAdmin() { return isActiveAdmin() && (role() == 'content_admin' || role() == 'superadmin' || role() == 'super_admin' || role() == 'admin'); }
-    function superAdmin() { return isActiveAdmin() && (role() == 'superadmin' || role() == 'super_admin' || role() == 'admin'); }
-    match /admins/{uid} { allow get: if signedIn() && (request.auth.uid == uid || superAdmin()); allow list: if superAdmin(); allow create, update: if superAdmin(); allow delete: if false; }
-    match /branches/{id} { allow read: if true; allow create, update, delete: if superAdmin(); }
-    match /categories/{id} { allow read: if true; allow create, update, delete: if superAdmin(); }
-    match /subjects/{id} { allow read: if true; allow create, update, delete: if contentAdmin(); }
-    match /resources/{id} { allow read: if true; allow create, update, delete: if contentAdmin(); }
-    match /foundations/{id} { allow read: if true; allow create, update, delete: if contentAdmin(); }
-    match /solutions/{id} { allow read: if true; allow create, update, delete: if contentAdmin(); }
-    match /flashcards/{id} { allow read: if true; allow create, update, delete: if contentAdmin(); }
-    match /curriculumUnits/{id} { allow read: if true; allow create, update, delete: if contentAdmin(); }
-    match /templates/{id} { allow read, create, update, delete: if contentAdmin(); }
-    match /sourceRegistry/{id} { allow read, create: if reviewer(); allow update, delete: if contentAdmin(); }
-    match /suggestions/{id} { allow create: if true; allow read, update: if reviewer(); allow delete: if false; }
-    match /problemReports/{id} { allow create: if true; allow read, update: if reviewer(); allow delete: if contentAdmin(); }
-    match /adminLogs/{id} { allow read: if superAdmin(); allow create: if isActiveAdmin() && request.resource.data.adminUid == request.auth.uid && request.resource.data.role == role(); allow update, delete: if false; }
+    function admin(uid) { return /databases/$(database)/documents/admins/$(uid); }
+    function activeAdmin() { return signedIn() && exists(admin(request.auth.uid)) && get(admin(request.auth.uid)).data.active == true; }
+    function role() { return activeAdmin() ? get(admin(request.auth.uid)).data.role : ''; }
+    function reviewer() { return activeAdmin() && role() in ['reviewer','content_admin','superadmin','super_admin','admin']; }
+    function contentAdmin() { return activeAdmin() && role() in ['content_admin','superadmin','super_admin','admin']; }
+    function superAdmin() { return activeAdmin() && role() in ['superadmin','super_admin','admin']; }
+    function validPublicPayload() { return request.resource.data.keys().hasOnly(['text','title','description','email','name','url','resourceId','createdAt','status','type','metadata']); }
+
+    match /admins/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || superAdmin());
+      allow list: if superAdmin();
+      allow create: if superAdmin();
+      allow update: if superAdmin();
+      allow delete: if false;
+    }
+    match /branches/{id} { allow read: if true; allow write: if superAdmin(); }
+    match /categories/{id} { allow read: if true; allow write: if superAdmin(); }
+    match /subjects/{id} { allow read: if true; allow write: if contentAdmin(); }
+    match /resources/{id} { allow read: if true; allow write: if contentAdmin(); }
+    match /foundations/{id} { allow read: if true; allow write: if contentAdmin(); }
+    match /solutions/{id} { allow read: if true; allow write: if contentAdmin(); }
+    match /flashcards/{id} { allow read: if true; allow write: if contentAdmin(); }
+    match /curriculumUnits/{id} { allow read: if true; allow write: if contentAdmin(); }
+    match /templates/{id} { allow read: if contentAdmin(); allow create, update, delete: if contentAdmin(); }
+    match /sourceRegistry/{id} { allow read: if reviewer(); allow create: if reviewer(); allow update, delete: if contentAdmin(); }
+
+    match /suggestions/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['text','title','email','name','createdAt','status','metadata']);
+      allow read, update: if reviewer();
+      allow delete: if false;
+    }
+    match /problemReports/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['text','title','email','name','resourceId','createdAt','status','metadata']);
+      allow read, update, delete: if contentAdmin();
+    }
+    match /adminLogs/{id} {
+      allow read: if superAdmin();
+      allow create: if activeAdmin() && request.resource.data.adminUid == request.auth.uid && request.resource.data.role == role();
+      allow update, delete: if false;
+    }
     match /{document=**} { allow read, write: if false; }
   }
 }
