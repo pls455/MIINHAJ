@@ -1,1 +1,1 @@
-name = "minhaj-ai"\nmain = "src/index.js"\ncompatibility_date = "2026-08-29"
+name = "minhaj-ai"\nmain = "src/index.js"\ncompatibility_date = "2026-08-29"\n\n[secrets]\nrequired = ["GEMINI_API_KEY"]
