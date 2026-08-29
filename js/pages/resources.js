@@ -40,27 +40,50 @@ function filters() {
   };
 }
 
+function setLoading() {
+  root.replaceChildren();
+  const state = document.createElement('div');
+  state.className = 'loading';
+  state.textContent = 'جاري تحميل المصادر...';
+  root.append(state);
+}
+
+function appendRows(rows) {
+  rows.forEach((row) => {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = resourceCard(row);
+    const node = wrapper.firstElementChild;
+    if (node) root.append(node);
+  });
+}
+
 async function load(reset = false) {
   if (busy) return;
   busy = true;
   const more = document.getElementById('moreResources');
   if (reset) {
     cursor = null;
-    root.replaceChildren();
-    root.innerHTML = '<div class="loading">جاري تحميل المصادر...</div>';
+    setLoading();
   }
   try {
     const result = await resourceRepository.searchResources(filters(), 24, cursor);
-    const html = result.rows.map(resourceCard).join('');
     if (reset) root.replaceChildren();
-    if (html) root.insertAdjacentHTML('beforeend', html);
+    appendRows(result.rows);
     cursor = result.nextCursor;
     more.hidden = !result.hasMore;
-    if (!result.rows.length && !root.children.length) root.innerHTML = '<div class="empty">لا توجد مصادر مطابقة.</div>';
+    if (!result.rows.length && !root.children.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = 'لا توجد مصادر مطابقة.';
+      root.append(empty);
+    }
   } catch (error) {
     console.error('[resources]', error);
     if (reset) root.replaceChildren();
-    root.innerHTML = '<div class="error-box">تعذر تحميل المصادر. حاول مرة أخرى.</div>';
+    const state = document.createElement('div');
+    state.className = 'error-box';
+    state.textContent = 'تعذر تحميل المصادر. حاول مرة أخرى.';
+    root.append(state);
     more.hidden = true;
   } finally {
     busy = false;
