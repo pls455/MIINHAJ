@@ -1,0 +1,26 @@
+rules_version='2';
+service cloud.firestore{
+ match /databases/{database}/documents{
+  function signedIn(){return request.auth!=null;}
+  function adminDoc(){return /databases/$(database)/documents/admins/$(request.auth.uid);}
+  function activeAdmin(){return signedIn()&&exists(adminDoc())&&get(adminDoc()).data.active==true;}
+  function role(){return activeAdmin()?get(adminDoc()).data.role:'';}
+  function level(n){return activeAdmin()&&((role()=='reviewer'&&n<=1)||(role()=='content_admin'&&n<=2)||(role() in ['superadmin','super_admin','admin']));}
+  function reviewer(){return level(1)} function contentAdmin(){return level(2)} function superAdmin(){return level(3)}
+  match /admins/{uid}{allow get:if signedIn()&&(request.auth.uid==uid||superAdmin());allow list,create,update:if superAdmin();allow delete:false;}
+  match /branches/{id}{allow read:true;allow create,update,delete:if superAdmin();}
+  match /subjects/{id}{allow read:true;allow create,update,delete:if contentAdmin();}
+  match /categories/{id}{allow read:true;allow create,update,delete:if superAdmin();}
+  match /resources/{id}{allow read:true;allow create,update,delete:if contentAdmin();}
+  match /foundations/{id}{allow read:true;allow create,update,delete:if contentAdmin();}
+  match /solutions/{id}{allow read:true;allow create,update,delete:if contentAdmin();}
+  match /curriculumUnits/{id}{allow read:true;allow create,update,delete:if contentAdmin();}
+  match /flashcards/{id}{allow read:true;allow create,update,delete:if contentAdmin();}
+  match /templates/{id}{allow read,create,update,delete:if contentAdmin();}
+  match /sourceRegistry/{id}{allow read,create:if reviewer();allow update,delete:if contentAdmin();}
+  match /suggestions/{id}{allow create:true;allow read,update:if reviewer();allow delete:false;}
+  match /problemReports/{id}{allow create:true;allow read,update:if reviewer();allow delete:if contentAdmin();}
+  match /adminLogs/{id}{allow read,create:if superAdmin();allow update,delete:false;}
+  match /{document=**}{allow read,write:false;}
+ }
+}
