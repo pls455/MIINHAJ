@@ -8,13 +8,7 @@ service cloud.firestore {
     function reviewer() { return isActiveAdmin() && (role() == 'reviewer' || role() == 'content_admin' || role() == 'superadmin' || role() == 'super_admin' || role() == 'admin'); }
     function contentAdmin() { return isActiveAdmin() && (role() == 'content_admin' || role() == 'superadmin' || role() == 'super_admin' || role() == 'admin'); }
     function superAdmin() { return isActiveAdmin() && (role() == 'superadmin' || role() == 'super_admin' || role() == 'admin'); }
-
-    match /admins/{uid} {
-      allow get: if signedIn() && (request.auth.uid == uid || superAdmin());
-      allow list: if superAdmin();
-      allow create, update: if superAdmin();
-      allow delete: if false;
-    }
+    match /admins/{uid} { allow get: if signedIn() && (request.auth.uid == uid || superAdmin()); allow list: if superAdmin(); allow create, update: if superAdmin(); allow delete: if false; }
     match /branches/{id} { allow read: if true; allow create, update, delete: if superAdmin(); }
     match /categories/{id} { allow read: if true; allow create, update, delete: if superAdmin(); }
     match /subjects/{id} { allow read: if true; allow create, update, delete: if contentAdmin(); }
@@ -24,14 +18,10 @@ service cloud.firestore {
     match /flashcards/{id} { allow read: if true; allow create, update, delete: if contentAdmin(); }
     match /curriculumUnits/{id} { allow read: if true; allow create, update, delete: if contentAdmin(); }
     match /templates/{id} { allow read, create, update, delete: if contentAdmin(); }
-    match /sourceRegistry/{id} { allow read: if reviewer(); allow create: if reviewer(); allow update, delete: if contentAdmin(); }
+    match /sourceRegistry/{id} { allow read, create: if reviewer(); allow update, delete: if contentAdmin(); }
     match /suggestions/{id} { allow create: if true; allow read, update: if reviewer(); allow delete: if false; }
     match /problemReports/{id} { allow create: if true; allow read, update: if reviewer(); allow delete: if contentAdmin(); }
-    match /adminLogs/{id} {
-      allow read: if superAdmin();
-      allow create: if isActiveAdmin() && request.resource.data.adminUid == request.auth.uid && request.resource.data.role == role();
-      allow update, delete: if false;
-    }
+    match /adminLogs/{id} { allow read: if superAdmin(); allow create: if isActiveAdmin() && request.resource.data.adminUid == request.auth.uid && request.resource.data.role == role(); allow update, delete: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }
