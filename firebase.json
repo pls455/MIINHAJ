@@ -1,1 +1,17 @@
-{"public":true,"rewrites":[{"source":"/admin","destination":"/admin/index.html"}],"headers":[{"source":"/*.html","headers":[{"key":"Cache-Control","value":"no-cache"}]}]}
+{
+  "public": true,
+  "rewrites": [
+    { "source": "/admin", "destination": "/admin/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/*.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    }
+  ],
+  "firestore": {
+    "rules": "firestore.rules"
+  }
+}
