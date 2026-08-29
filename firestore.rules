@@ -22,19 +22,19 @@ service cloud.firestore {
     match /subjects/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /resources/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /foundations/{id} { allow read: if true; allow write: if contentAdmin(); }
-    match /solutions/{id} { allow read: if true; allow write: if contentAdmin(); }
-    match /flashcards/{id} { allow read: if true; allow write: if contentAdmin(); }
-    match /curriculumUnits/{id} { allow read: if true; allow write: if contentAdmin(); }
+    match /solutions/{id} { allow read: true; allow write: if contentAdmin(); }
+    match /flashcards/{id} { allow read: true; allow write: if contentAdmin(); }
+    match /curriculumUnits/{id} { allow read: true; allow write: if contentAdmin(); }
     match /templates/{id} { allow read: if contentAdmin(); allow create, update, delete: if contentAdmin(); }
     match /sourceRegistry/{id} { allow read: if reviewer(); allow create: if reviewer(); allow update, delete: if contentAdmin(); }
 
     match /suggestions/{id} {
-      allow create: if request.resource.data.keys().hasOnly(['text','title','email','name','createdAt','status','metadata']);
+      allow create: if validPublicPayload();
       allow read, update: if reviewer();
       allow delete: if false;
     }
     match /problemReports/{id} {
-      allow create: if request.resource.data.keys().hasOnly(['text','title','email','name','resourceId','createdAt','status','metadata']);
+      allow create: if validPublicPayload();
       allow read, update, delete: if contentAdmin();
     }
     match /adminLogs/{id} {
