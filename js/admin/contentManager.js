@@ -1,5 +1,4 @@
-import { requireAuth, currentAdmin } from '../services/auth.js';
-import { ROLES, hasRole } from '../core/constants.js';
+import { requireAdmin, ROLES } from '../services/firebase/adminCore.js';
 import { listAdminCollection, saveAdminItem, removeAdminItem } from './adminDataRepository.js';
 
 const params = new URLSearchParams(location.search);
@@ -51,9 +50,7 @@ async function remove(item) {
   catch (e) { console.error(e); alert('تعذر الحذف. قد تكون هناك علاقات مرتبطة بهذا العنصر.'); }
 }
 
-await requireAuth();
-const admin = await currentAdmin();
-if (!admin || !hasRole(admin.role, ROLES.CONTENT_ADMIN)) throw new Error('INSUFFICIENT_PERMISSIONS');
+await requireAdmin(ROLES.CONTENT_ADMIN);
 
 document.title = `إدارة ${label} | مِنهَاج`;
 $('page-title').textContent = `إدارة ${label}`;
