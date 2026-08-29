@@ -26,6 +26,19 @@ export function assertRole(userRole, requiredRole) {
     error.code = "permission-denied";
     throw error;
   }
+  return true;
+}
+
+export async function requireAdmin(requiredRole = ROLES.REVIEWER) {
+  const { currentAdmin } = await import("../auth.js");
+  const admin = await currentAdmin();
+  if (!admin) {
+    const error = new Error("AUTH_REQUIRED");
+    error.code = "AUTH_REQUIRED";
+    throw error;
+  }
+  assertRole(admin.role, requiredRole);
+  return admin;
 }
 
 export const permissions = Object.freeze({
