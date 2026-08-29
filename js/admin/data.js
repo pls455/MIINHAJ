@@ -24,9 +24,29 @@ export function getAdmin(){ return state.admin; }
 export function allowed(c){ return !!state.admin && can(state.admin.role, configs[c]?.role || 'reviewer'); }
 export function canWrite(c){ const cfg=configs[c]; return allowed(c) && !cfg.readOnly && can(state.admin.role, cfg.writeRole || cfg.role); }
 export async function loadPage(c, filters={}) { const cfg=configs[c]; return getPage(c,{...filters,searchField:cfg.searchField,orderField:cfg.orderField},20,state.cursor); }
-export async function persist(c,id,payload){ if(!canWrite(c)) throw Error('ليس لديك صلاحية للكتابة'); const saved=await save(c,id,payload); await logAction(state.admin,id?'update':'create',c,saved,payload.title||payload.name||payload.email||''); return saved; }
+export async function persist(c,id,payload){ if(!canWrite(c)) throw Error('ليس لديك صلاحية للكتابة'); const saved=await save(c,id,payload); await logAction(state.admin,id?'update':'create',c,saved,payload.title||payload.name||payload.question||payload.email||''); return saved; }
 export async function erase(c,id){ if(!canWrite(c)) throw Error('ليس لديك صلاحية للحذف'); await remove(c,id); await logAction(state.admin,'delete',c,id,''); }
 export async function stats(){ const names=['branches','subjects','categories','resources','foundations','suggestions','problemReports']; const out={}; await Promise.all(names.map(async n=>{const f=n==='suggestions'?{status:'pending'}:n==='problemReports'?{status:'open'}:{active:true};out[n]=await count(n,f)}));return out; }
-export function toPayload(c,form){ const p={}; for(const [key,type] of Object.entries(configs[c].fields)){const el=form.elements[key];if(!el)continue;if(type==='checkbox')p[key]=el.checked;else if(type==='number'){const n=Number(el.value);if(!Number.isInteger(n)||n<0)throw Error('الترتيب يجب أن يكون رقمًا صحيحًا غير سالب');p[key]=n;}else if(type==='ids')p[key]=el.value.split(',').map(x=>x.trim()).filter(Boolean);else{const value=el.value.trim();if((key==='url')&&value){try{const u=new URL(value);if(!['http:','https:'].includes(u.protocol))throw 0;}catch{throw Error('الرابط يجب أن يبدأ بـ http أو https');}}p[key]=value;}} return p; }
+export function toPayload(c,form){
+  const p={};
+  for(const [key,type] of Object.entries(configs[c].fields)){
+    const el=form.elements[key]; if(!el) continue;
+    if(type==='checkbox') p[key]=el.checked;
+    else if(type==='number'){const n=Number(el.value);if(!Number.isInteger(n)||n<0)throw Error('الترتيب يجب أن يكون رقمًا صحيحًا غير سالب');p[key]=n;}
+    else if(type==='ids') p[key]=el.value.split(',').map(x=>x.trim()).filter(Boolean);
+    else{
+      const value=el.value.trim();
+      if(key==='url'&&value){try{const u=new URL(value);if(!['http:','https:'].includes(u.protocol))throw 0;}catch{throw Error('الرابط يجب أن يبدأ بـ http أو https');}}
+      p[key]=value;
+    }
+  }
+  if(c==='flashcards'){
+    if(!p.question || p.question.length < 2) throw Error('السؤال مطلوب ويجب أن يحتوي على حرفين على الأقل');
+    if(!p.answer || p.answer.length < 1) throw Error('الإجابة مطلوبة');
+    if(p.question.length > 5000 || p.answer.length > 10000 || (p.explanation||'').length > 10000) throw Error('محتوى البطاقة أطول من الحد المسموح');
+    if(p.subjectId && !/^[A-Za-z0-9_-]+$/.test(p.subjectId)) throw Error('معرّف المادة غير صالح');
+  }
+  return p;
+}
 export function initialValue(type,v){if(type==='checkbox')return !!v;if(type==='ids')return Array.isArray(v)?v.join(', '):String(v||'');return String(v??'');}
 export { state };
