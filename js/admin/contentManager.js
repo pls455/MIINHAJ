@@ -34,13 +34,16 @@ function openForm(item = null) {
   $('item-description').value = item?.description || '';
   $('item-icon').value = item?.icon || '';
   $('item-order').value = item?.order ?? 0;
-  $('item-stable').value = item?.stableId || '';
   $('item-active').checked = item?.active !== false;
-  $('item-form').hidden = false;
+  if ($('item-stable')) $('item-stable').value = item?.stableId || '';
+  if ($('item-branches')) $('item-branches').value = Array.isArray(item?.branchIds) ? item.branchIds.join(', ') : '';
+  if ($('stable-wrap')) $('stable-wrap').hidden = collectionName !== 'categories';
+  if ($('branches-wrap')) $('branches-wrap').hidden = collectionName !== 'subjects';
+  $('item-form').showModal();
   $('item-name').focus();
 }
 
-function closeForm() { $('item-form').hidden = true; editingId = null; }
+function closeForm() { if ($('item-form').open) $('item-form').close(); editingId = null; }
 async function load() { rows = await listAdminCollection(collectionName); render(); }
 async function remove(item) {
   if (!confirm(`تأكيد حذف «${item.name || ''}»؟`)) return;
