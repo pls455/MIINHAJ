@@ -1,23 +1,25 @@
-import { requireAuthenticatedAdmin, logout } from '../services/firebase/auth.js';
-import { repositories } from '../repositories/resourceRepository.js';
-import { can } from '../services/firebase/permissions.js';
+import { requireAuthenticatedAdmin, signOutUser } from '../services/firebase/auth.js';
+import { repositories, count } from '../repositories/resourceRepository.js';
+import { permissions } from '../services/firebase/permissions.js';
 
 const content = document.getElementById('adminContent');
 const identity = document.getElementById('adminIdentity');
 
-document.getElementById('logoutButton').addEventListener('click', async () => {
-  await logout();
+document.getElementById('logoutButton')?.addEventListener('click', async () => {
+  await signOutUser();
   location.href = '../admin/index.html';
 });
 
 function card(label, value) {
-  return `<article class="admin-stat"><span>${label}</span><strong>${value}</strong></article>`;
+  return `<article class="admin-stat"><span>${label}</span><strong>${value.toLocaleString('ar-EG')}</strong></article>`;
 }
 
 function sectionLinks(admin) {
   const links = [];
-  if (can(admin.role, 'review')) links.push('<a class="admin-nav-card" href="suggestions.html">الاقتراحات والبلاغات</a>');
-  if (can(admin.role, 'manageContent')) {
+  if (permissions.review(admin.role)) {
+    links.push('<a class="admin-nav-card" href="suggestions.html">الاقتراحات والبلاغات</a>');
+  }
+  if (permissions.content(admin.role)) {
     links.push('<a class="admin-nav-card" href="resources.html">المصادر</a>');
     links.push('<a class="admin-nav-card" href="subjects.html">المواد</a>');
     links.push('<a class="admin-nav-card" href="branches.html">الفروع</a>');
@@ -27,25 +29,29 @@ function sectionLinks(admin) {
     links.push('<a class="admin-nav-card" href="templates.html">Templates</a>');
     links.push('<a class="admin-nav-card" href="bulk-import.html">Bulk Import</a>');
   }
-  if (can(admin.role, 'manageAdmins')) links.push('<a class="admin-nav-card" href="logs.html">سجلات الإدارة</a>');
+  if (permissions.system(admin.role)) {
+    links.push('<a class="admin-nav-card" href="logs.html">سجلات الإدارة</a>');
+  }
   return links.join('');
 }
 
 async function load() {
   try {
-    const admin = await requireAuthenticatedAdmin();
-    identity.textContent = `${admin.email || 'حساب الإدارة'} • ${admin.role}`;
+    const { user, admin } = await requireAuthenticatedAdmin();
+    identity.textContent = `${user.email || admin.email || 'حساب الإدارة'} • ${admin.role || 'reviewer'}`;
+
     const [branches, subjects, categories, resources, foundations] = await Promise.all([
-      repositories.branches.page({}, 1),
-      repositories.subjects.page({}, 1),
-      repositories.categories.page({}, 1),
-      repositories.resources.getResources({}, 1),
-      repositories.foundations.page({}, 1)
+      count('branches', { active: true }),
+      count('subjects', { active: true }),
+      count('categories', { active: true }),
+      count('resources', { active: true }),
+      count('foundations', { active: true })
     ]);
-    content.innerHTML = `<div class="admin-stats">${card('الفروع', branches.rows.length)}${card('المواد', subjects.rows.length)}${card('التصنيفات', categories.rows.length)}${card('المصادر', resources.rows.length)}${card('التأسيس', foundations.rows.length)}</div><nav class="admin-nav-grid" aria-label="أقسام الإدارة">${sectionLinks(admin)}</nav>`;
+
+    content.innerHTML = `<div class="admin-stats">${card('الفروع', branches)}${card('المواد', subjects)}${card('التصنيفات', categories)}${card('المصادر', resources)}${card('التأسيس', foundations)}</div><nav class="admin-nav-grid" aria-label="أقسام الإدارة">${sectionLinks(admin)}</nav>`;
   } catch (error) {
     console.error('[admin-dashboard]', error);
-    content.innerHTML = '<div class="error-box">تعذر التحقق من صلاحيات الإدارة.</div>';
+    content.innerHTML = '<div class="error-box">تعذر التحقق من صلاحيات الإدارة أو تحميل الإحصائيات.</div>';
   }
 }
 
