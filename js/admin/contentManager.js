@@ -17,7 +17,7 @@ function render() {
     const row = document.createElement('article'); row.className = 'card admin-row';
     const info = document.createElement('div');
     const h = document.createElement('h3'); h.textContent = item.name || 'بدون اسم';
-    const p = document.createElement('p'); p.textContent = `${item.active === false ? 'معطّل' : 'مفعّل'} • الترتيب ${item.order ?? 0}`;
+    const p = document.createElement('p'); p.textContent = `${item.active === false ? 'معطّل' : 'مفعّل'} • الترتيب ${Number(item.order) || 0}`;
     info.append(h,p);
     const actions = document.createElement('div'); actions.className = 'actions';
     const edit = document.createElement('button'); edit.className='button'; edit.textContent='تعديل'; edit.onclick=()=>openForm(item);
@@ -32,7 +32,7 @@ function openForm(item = null) {
   $('item-name').value = item?.name || '';
   $('item-description').value = item?.description || '';
   $('item-icon').value = item?.icon || '';
-  $('item-order').value = item?.order ?? 0;
+  $('item-order').value = Number.isFinite(Number(item?.order)) ? Number(item.order) : 0;
   $('item-active').checked = item?.active !== false;
   if ($('item-stable')) $('item-stable').value = item?.stableId || '';
   if ($('item-branches')) $('item-branches').value = Array.isArray(item?.branchIds) ? item.branchIds.join(', ') : '';
@@ -59,10 +59,17 @@ $('add-item').onclick = () => openForm();
 $('cancel-form').onclick = closeForm;
 $('item-form').addEventListener('submit', async event => {
   event.preventDefault();
-  const data = { name: $('item-name').value, description: $('item-description').value, icon: $('item-icon').value, order: $('item-order').value, active: $('item-active').checked };
-  if (collectionName === 'categories') data.stableId = $('item-stable').value;
+  const name = $('item-name').value.trim();
+  const order = Number($('item-order').value);
+  if (!name) return alert('الاسم مطلوب.');
+  if (!Number.isInteger(order) || order < 0) return alert('الترتيب يجب أن يكون رقمًا صحيحًا موجبًا أو صفرًا.');
+  const data = { name, description: $('item-description').value.trim(), icon: $('item-icon').value.trim(), order, active: $('item-active').checked };
+  if (collectionName === 'categories') {
+    data.stableId = $('item-stable').value.trim();
+    if (!data.stableId) return alert('stableId مطلوب للتصنيف.');
+  }
   if (collectionName === 'subjects') data.branchIds = $('item-branches').value.split(',').map(v => v.trim()).filter(Boolean);
   try { await saveAdminItem(collectionName, editingId, data); closeForm(); await load(); }
-  catch (e) { console.error(e); alert(e.message === 'ADMIN_NAME_REQUIRED' ? 'الاسم مطلوب.' : e.message === 'CATEGORY_STABLE_ID_REQUIRED' ? 'stableId مطلوب للتصنيف.' : 'تعذر الحفظ.'); }
+  catch (e) { console.error(e); alert('تعذر الحفظ. تحقق من الصلاحيات والبيانات.'); }
 });
 await load();
