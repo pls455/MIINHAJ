@@ -1,46 +1,116 @@
 # مِنهَاج | Minhaj 2.0
 
-إعادة بناء كاملة لمنصة مِنهَاج باستخدام HTML5 وCSS3 وVanilla JavaScript ES Modules وFirebase وCloudflare Workers/Gemini. لا React، لا TypeScript، ولا حفلة build لمجرد عرض `index.html`.
+إعادة بناء كاملة لمنصة مِنهَاج باستخدام HTML5 وCSS3 وVanilla JavaScript ES Modules وFirebase وCloudflare Workers/Gemini.
+
+## المبدأ
+- لا React.
+- لا TypeScript.
+- لا SPA framework.
+- لا build step للموقع static.
+- لا Mock data في الإنتاج.
+- لا حذف destructive لبيانات Firebase.
 
 ## المعمارية
-- `*.html`: صفحات مستقلة، مناسبة لـ GitHub Pages.
-- `css/`: متغيرات، مكونات، responsive، وإدارة.
-- `js/components/`: واجهات مشتركة.
-- `js/services/firebase/`: اتصال Firebase.
+- `*.html`: صفحات مستقلة مناسبة لـ GitHub Pages.
+- `css/`: design tokens، layout، components، responsive، admin.
+- `js/components/`: واجهات مشتركة مثل shell/navigation/UI states.
+- `js/services/firebase/`: auth، permissions، Firestore access.
 - `js/services/ai/`: عميل Cloudflare Worker.
-- `js/repositories/`: طبقة Firestore مع pagination/cursors وfilters.
+- `js/repositories/`: طبقة البيانات والاستعلامات والـ pagination.
 - `js/pages/`: منطق صفحات الطلاب.
-- `js/admin/`: المصادقة، الصلاحيات، CRUD، السجل والاستيراد.
-- `cloudflare-worker/`: Gateway إلى Gemini.
+- `js/admin/`: منطق لوحة الإدارة.
+- `cloudflare-worker/`: gateway إلى Gemini.
+- `tests/`: smoke checks للمشروع static.
 
 ## Firebase
-المشروع يستخدم Firebase الحالي `minhaj-1be6f`. إعداد العميل الموجود في `js/services/firebase.js` ليس سرًا، أما مفاتيح Gemini فلا توضع في المستودع.
+المشروع يستخدم Firebase الحالي `minhaj-1be6f`. إعداد Firebase client ليس secret. **لا تضع Gemini API key في frontend أو GitHub.**
 
 القواعد موجودة في `firestore.rules`. الأدوار: `reviewer`، `content_admin`، `superadmin`.
 
-## البيانات
-الطبقة المركزية تدعم: branches, subjects, categories, resources, foundations, solutions, flashcards, suggestions, problemReports, templates, sourceRegistry, admins وadminLogs، مع دعم IDs مستقرة وعلاقات قائمة على IDs.
+### Collections
+الطبقة المركزية تدعم: `branches`, `subjects`, `categories`, `resources`, `foundations`, `solutions`, `flashcards`, `suggestions`, `problemReports`, `templates`, `sourceRegistry`, `admins`, `adminLogs`.
 
-## الأداء
-صفحات المصادر لا تستخدم `getDocs(collection(resources))` ولا تحمل آلاف المستندات. الاستعلامات تستخدم filters داخل Firestore و`limit` و`startAfter`، والواجهة تعرض 20-24 عنصرًا في الدفعة. البحث النصي الكامل داخل Firestore محدود بطبيعة Firestore، لذلك البحث المدعوم هنا هو prefix على الحقل المناسب، مع filters منظمة.
+لا تعتمد العلاقات على أسماء العناصر، بل على IDs مستقرة حيث يدعمها النموذج.
+
+## Resources & Performance
+استعلامات المصادر bounded وليست تحميلًا كاملًا للمجموعة. استخدم `limit` وcursors وfilters، والبحث النصي الكامل يجب ألا يُنفذ عبر تحميل آلاف الوثائق للمتصفح. عند الحاجة إلى full-text search، أضف search index/service مخصص بدل تحويل Firestore إلى محرك بحث بالقوة.
+
+## Admin
+الأدوار:
+- **Reviewer:** مراجعة المحتوى والاقتراحات والبلاغات وفق الصلاحيات.
+- **Content Admin:** إدارة المحتوى.
+- **Super Admin:** إدارة كاملة وصلاحيات الإدارة العليا.
+
+التحكم في الصلاحيات يجب أن يكون موجودًا في JavaScript لتجربة المستخدم **وفي Firestore Rules للحماية الفعلية**.
 
 ## AI / Gemini
-الواجهة تتصل بـ Cloudflare Worker. الـ Worker يوفّر `/health` و`/ai` و`/resource-search` و`/study-plan` و`/classify`. ضع `GEMINI_API_KEY` كـ Worker Secret، ويمكن ضبط `GEMINI_MODEL` و`ALLOWED_ORIGIN` كمتغيرات بيئة.
+التدفق:
 
-مثال إعداد الأسرار عبر Wrangler:
+`User → AI Service → Cloudflare Worker → Gemini`
+
+ولا تُرسل قاعدة البيانات كاملة إلى Gemini. استخدم retrieval/filtering ثم أرسل فقط السياق المرتبط بالسؤال.
+
+الـ Worker يدعم حسب النسخة الحالية endpoints مثل `/health` و`/ai` وعمليات البحث/الخطة والتصنيف. اضبط:
+
+```text
+GEMINI_API_KEY   Worker Secret
+GEMINI_MODEL     Worker environment variable
+ALLOWED_ORIGIN   Worker environment variable
+```
+
+### Cloudflare deployment
+من مجلد الـ Worker:
+
 ```bash
 wrangler secret put GEMINI_API_KEY
+wrangler deploy
 ```
-ثم انشر Worker من مجلد `cloudflare-worker`.
 
-## التشغيل
-لا يوجد build مطلوب للموقع. افتح عبر خادم static محلي عند الحاجة، أو انشر الجذر مباشرة على GitHub Pages. لا تفتح صفحات ES Modules من `file://` في بعض المتصفحات.
+بعد النشر، ضع عنوان الـ Worker الفعلي في إعداد عميل AI بدل أي placeholder.
 
-## Bulk Import
-من لوحة الإدارة استخدم Bulk Import: ألصق JSON، نفّذ Preview، راجع الأخطاء والتكرارات، ثم نفّذ الاستيراد. التنفيذ يتم على دفعات 400 عملية كحد أقصى لكل batch.
+## التشغيل المحلي
+لأن الصفحات تستخدم ES Modules، استخدم static server بدل `file://`:
 
-## ملاحظات الهجرة
-لم تُنفّذ أي عملية حذف على بيانات Firebase الحقيقية. إعادة البناء تستخدم الـ schema والـ collections الموجودة كمرجع، وتجنب migrations destructive. قبل أي تغيير schema فعلي، نفّذ migration منفصلًا ومُسجلًا.
+```bash
+python3 -m http.server 8080
+```
+
+ثم افتح `http://localhost:8080`.
 
 ## GitHub Pages
-الموقع static بالكامل. استخدم branch `main` كمصدر النشر. Worker مستقل عن GitHub Pages.
+الموقع static ويتم نشره من `main` عبر `.github/workflows/pages.yml`.
+
+في GitHub:
+1. `Settings` → `Pages`.
+2. اختر `GitHub Actions` كمصدر النشر.
+3. ادفع التغييرات إلى `main`.
+4. راقب workflow حتى يصبح `success`.
+
+## Smoke Test
+الاختبار الموجود في `tests/smoke-test.mjs` يفحص الملفات الأساسية ومراجع frontend الممنوعة. إذا أردت تشغيله محليًا:
+
+```bash
+node tests/smoke-test.mjs
+```
+
+## Bulk Import
+التدفق المقصود:
+
+`JSON → Validation → Preview/Dry Run → Duplicate Detection → Execute`
+
+لا تنفذ import على بيانات حقيقية قبل مراجعة الـ preview.
+
+## Security checklist
+- Gemini key خارج frontend.
+- Firestore Rules هي طبقة الحماية النهائية.
+- Escape للبيانات المعروضة.
+- تحقق من روابط المصادر قبل حفظها.
+- لا تستخدم `catch {}` لإخفاء الأخطاء.
+- تجنب listeners realtime على collections ضخمة بلا حاجة.
+- لا تحمل آلاف المصادر إلى المتصفح للبحث.
+
+## Migration
+لم تُنفذ عملية حذف لبيانات Firebase الحقيقية. أي تغيير schema يجب أن يكون migration منفصلًا، non-destructive، idempotent، ومسجلًا قبل تطبيقه على الإنتاج.
+
+## Status
+Deployment الخاص بـ GitHub Pages تم التحقق منه كـ `success` بعد ضبط Pages على GitHub Actions. يبقى نشر Cloudflare Worker وربط عنوانه الفعلي خطوة تشغيلية منفصلة عن GitHub Pages.
