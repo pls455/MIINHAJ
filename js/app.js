@@ -1,10 +1,9 @@
-import "./core/theme.js";
-import { renderNavbar } from "./components/navbar.js";
-import { renderFooter } from "./components/footer.js";
+import './core/theme.js';
+import { renderNavbar, renderFooter } from './components/layout.js';
 
 export function bootstrapPublicPage() {
   renderNavbar();
   renderFooter();
 }
 
-document.addEventListener("DOMContentLoaded", bootstrapPublicPage);
+document.addEventListener('DOMContentLoaded', bootstrapPublicPage);
