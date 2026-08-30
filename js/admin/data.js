@@ -1,6 +1,6 @@
 import { getPage, save, remove, count } from '../repositories/resourceRepository.js';
 import { logAction } from './audit.js';
-import { can } from '../services/auth.js';
+import { hasRole } from '../services/firebase/adminCore.js';
 
 export const configs = {
   branches:{label:'الفروع',role:'superadmin',searchField:'name',fields:{name:'text',stableId:'text',description:'textarea',icon:'text',order:'number',active:'checkbox'}},
@@ -20,8 +20,8 @@ export const configs = {
 
 let state={collection:'branches',cursor:null,admin:null};
 export function setAdmin(a){state.admin=a} export function getAdmin(){return state.admin}
-export function allowed(c){return !!state.admin&&can(state.admin.role,configs[c]?.role||'reviewer')}
-export function canWrite(c){const cfg=configs[c];return allowed(c)&&!cfg.readOnly&&can(state.admin.role,cfg.writeRole||cfg.role)}
+export function allowed(c){return !!state.admin&&hasRole(state.admin.role,configs[c]?.role||'reviewer')}
+export function canWrite(c){const cfg=configs[c];return allowed(c)&&!cfg.readOnly&&hasRole(state.admin.role,cfg.writeRole||cfg.role)}
 export async function loadPage(c,filters={}){const cfg=configs[c];return getPage(c,{...filters,searchField:cfg.searchField,orderField:cfg.orderField},20,state.cursor)}
 export async function persist(c,id,payload){if(!canWrite(c))throw Error('ليس لديك صلاحية للكتابة');const saved=await save(c,id,payload);await logAction(state.admin,id?'update':'create',c,saved,payload.title||payload.name||payload.question||payload.email||payload.sourceId||'');return saved}
 export async function erase(c,id){if(!canWrite(c))throw Error('ليس لديك صلاحية للحذف');await remove(c,id);await logAction(state.admin,'delete',c,id,'')}
