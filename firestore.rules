@@ -8,7 +8,6 @@ service cloud.firestore {
     function reviewer() { return activeAdmin() && role() in ['reviewer','content_admin','superadmin','super_admin','admin']; }
     function contentAdmin() { return activeAdmin() && role() in ['content_admin','superadmin','super_admin','admin']; }
     function superAdmin() { return activeAdmin() && role() in ['superadmin','super_admin','admin']; }
-    function validPublicPayload() { return request.resource.data.keys().hasOnly(['text','title','description','email','name','url','resourceId','createdAt','status','type','metadata']); }
 
     match /admins/{uid} {
       allow get: if signedIn() && (request.auth.uid == uid || superAdmin());
@@ -32,12 +31,29 @@ service cloud.firestore {
     match /sourceRegistry/{id} { allow read: if reviewer(); allow create: if reviewer(); allow update, delete: if contentAdmin(); }
 
     match /suggestions/{id} {
-      allow create: if validPublicPayload();
-      allow read, update: if reviewer();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['title','description','url','resourceId','type','metadata','createdAt'])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 200
+        && (!('description' in request.resource.data) || request.resource.data.description is string)
+        && (!('url' in request.resource.data) || request.resource.data.url is string)
+        && (!('resourceId' in request.resource.data) || request.resource.data.resourceId is string)
+        && (!('type' in request.resource.data) || request.resource.data.type is string)
+        && (!('metadata' in request.resource.data) || request.resource.data.metadata is map)
+        && (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp);
+      allow read: if reviewer();
+      allow update: if reviewer()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy','reviewerNote','updatedAt']);
       allow delete: if false;
     }
+
     match /problemReports/{id} {
-      allow create: if validPublicPayload();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['text','title','description','email','name','url','resourceId','createdAt','type','metadata'])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 5000;
       allow read, update, delete: if contentAdmin();
     }
     match /adminLogs/{id} {
