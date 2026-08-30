@@ -1,5 +1,4 @@
-// Admin bootstrap: keep the dashboard available even when an optional module fails to parse.
-// Optional admin modules should be loaded lazily by their feature entry points.
+// Admin bootstrap: optional admin modules must not block initial dashboard rendering.
 import { requireAdmin } from './auth.js';
 import { initAdminDashboard } from './dashboard.js';
 
