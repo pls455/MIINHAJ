@@ -9,11 +9,11 @@ export const configs = {
   resources:{label:'المصادر',role:'content_admin',searchField:'title',fields:{title:'text',url:'url',description:'textarea',type:'text',subjectId:'text',categoryId:'text',branchIds:'ids',keywords:'ids',tags:'ids',author:'text',order:'number',active:'checkbox'}},
   foundations:{label:'التأسيس',role:'content_admin',searchField:'title',fields:{title:'text',url:'url',description:'textarea',type:'text',level:'text',subjectId:'text',branchIds:'ids',keywords:'ids',author:'text',order:'number',active:'checkbox'}},
   solutions:{label:'الحلول',role:'content_admin',searchField:'title',fields:{title:'text',category:'text',categoryName:'text',problem:'textarea',solution:'textarea',steps:'textarea',notes:'textarea',keywords:'ids',order:'number',status:'text',active:'checkbox'}},
-  flashcards:{label:'البطاقات',role:'content_admin',searchField:'question',fields:{question:'textarea',answer:'textarea',explanation:'textarea',subjectId:'text',branchIds:'ids',order:'number',active:'checkbox'}},
+  flashcards:{label:'البطاقات',role:'content_admin',searchField:'question',fields:{question:'textarea',answer:'textarea',explanation:'textarea',subjectId:'text',branchId:'text',order:'number',active:'checkbox'}},
   templates:{label:'Templates',role:'content_admin',searchField:'name',fields:{name:'text',target:'text',description:'textarea',fields:'ids',instructions:'ids'}},
   sourceRegistry:{label:'Source Registry',role:'reviewer',writeRole:'content_admin',searchField:'name',orderField:'createdAt',fields:{sourceId:'text',name:'text',path:'text',mimeType:'text',status:'text',branchIds:'ids',subjectId:'text',categoryId:'text',needsReview:'checkbox'}},
-  suggestions:{label:'الاقتراحات',role:'reviewer',searchField:'title',orderField:'createdAt',fields:{title:'text',url:'url',description:'textarea',contentType:'text',status:'text'}},
-  problemReports:{label:'البلاغات',role:'reviewer',writeRole:'content_admin',searchField:'sourceTitle',orderField:'createdAt',fields:{sourceId:'text',sourceTitle:'text',kind:'text',description:'textarea',status:'text'}},
+  suggestions:{label:'الاقتراحات',role:'reviewer',readOnly:true,searchField:'title',orderField:'createdAt',fields:{title:'text',url:'url',description:'textarea',contentType:'text',status:'text'}},
+  problemReports:{label:'البلاغات',role:'reviewer',readOnly:true,searchField:'sourceTitle',orderField:'createdAt',fields:{sourceId:'text',sourceTitle:'text',kind:'text',description:'textarea',status:'text'}},
   admins:{label:'المشرفون',role:'superadmin',searchField:'email',orderField:'createdAt',fields:{email:'email',role:'text',active:'checkbox'}},
   adminLogs:{label:'سجل الإدارة',role:'superadmin',readOnly:true,searchField:'collection',orderField:'createdAt',fields:{action:'text',collection:'text',targetId:'text',details:'textarea',adminUid:'text',adminEmail:'email',role:'text'}}
 };
@@ -37,8 +37,8 @@ export function toPayload(c,form){
     else{const value=el.value.trim();if(key==='url'&&value){try{const u=new URL(value);if(!['http:','https:'].includes(u.protocol))throw 0}catch{throw Error('الرابط يجب أن يبدأ بـ http أو https')}}p[key]=value}
   }
   if(c==='flashcards'){if(!p.question||p.question.length<2)throw Error('السؤال مطلوب ويجب أن يحتوي على حرفين على الأقل');if(!p.answer)throw Error('الإجابة مطلوبة');if(p.question.length>5000||p.answer.length>10000||(p.explanation||'').length>10000)throw Error('محتوى البطاقة أطول من الحد المسموح');if(p.subjectId&&!/^[A-Za-z0-9_-]+$/.test(p.subjectId))throw Error('معرّف المادة غير صالح')}
-  if(c==='suggestions'){if(!p.title||p.title.length<3)throw Error('عنوان الاقتراح مطلوب');if((p.description||'').length>5000)throw Error('الاقتراح طويل جدًا');if(p.status&&!['pending','approved','rejected'].includes(p.status))throw Error('حالة الاقتراح غير صالحة')}
-  if(c==='problemReports'){if(!p.description||p.description.length<5)throw Error('وصف البلاغ مطلوب');if(p.description.length>5000)throw Error('البلاغ طويل جدًا');if(p.status&&!['open','reviewing','resolved','rejected'].includes(p.status))throw Error('حالة البلاغ غير صالحة')}
+  if(c==='suggestions'){if(!p.title||p.title.length<3)throw Error('عنوان الاقتراح مطلوب');if((p.description||'').length>5000)throw Error('الاقتراح طويل جدًا')}
+  if(c==='problemReports'){if(!p.description||p.description.length<5)throw Error('وصف البلاغ مطلوب');if(p.description.length>2000)throw Error('البلاغ طويل جدًا')}
   if(c==='templates'){if(!p.name||p.name.length<2)throw Error('اسم القالب مطلوب');if(!p.target)throw Error('يجب تحديد هدف القالب');if(p.fields.length>100)throw Error('عدد حقول القالب كبير جدًا');if(p.instructions.length>100)throw Error('عدد تعليمات القالب كبير جدًا')}
   if(c==='sourceRegistry'){if(!p.sourceId||!/^[A-Za-z0-9_-]{2,128}$/.test(p.sourceId))throw Error('sourceId غير صالح');if(!p.name||p.name.length<2)throw Error('اسم المصدر مطلوب');if(p.path&&p.path.length>2000)throw Error('مسار المصدر طويل جدًا');if(p.status&&!['pending','indexed','ready','error','archived'].includes(p.status))throw Error('حالة المصدر غير صالحة')}
   return p
