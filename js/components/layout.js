@@ -34,3 +34,25 @@ export function mountShell(title, content) {
     localStorage.setItem('minhaj-theme', next);
   });
 }
+
+export function renderNavbar(root = document.body) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = navbar();
+  const header = wrapper.firstElementChild;
+  root.prepend(header);
+  const menu = header.querySelector('.menu-toggle');
+  const nav = header.querySelector('#site-navigation');
+  menu?.addEventListener('click', () => {
+    const open = nav?.classList.toggle('open');
+    menu.setAttribute('aria-expanded', String(Boolean(open)));
+  });
+  return header;
+}
+
+export function renderFooter(root = document.body) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = footer();
+  const element = wrapper.firstElementChild;
+  root.append(element);
+  return element;
+}
