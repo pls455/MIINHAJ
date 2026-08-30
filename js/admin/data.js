@@ -43,7 +43,7 @@ export function toPayload(c,form){
   if(c==='suggestions'){if(!p.title||p.title.length<3)throw Error('عنوان الاقتراح مطلوب');if((p.description||'').length>5000)throw Error('الاقتراح طويل جدًا')}
   if(c==='problemReports'){if(!p.description||p.description.length<5)throw Error('وصف البلاغ مطلوب');if(p.description.length>2000)throw Error('البلاغ طويل جدًا')}
   if(c==='templates'){if(!p.name||p.name.length<2)throw Error('اسم القالب مطلوب');if(!p.target)throw Error('يجب تحديد هدف القالب');if(p.fields.length>100)throw Error('عدد حقول القالب كبير جدًا');if(p.instructions.length>100)throw Error('عدد تعليمات القالب كبير جدًا')}
-  if(c==='sourceRegistry'){if(!p.sourceId||!/^[A-Za-z0-9_-]{2,128}$/.test(p.sourceId))throw Error('معرّف المصدر غير صالح');if(!p.name||p.name.length<2)throw Error('اسم المصدر مطلوب');if(p.path&&p.path.length>2000)throw Error('مسار المصدر طويل جدًا');if(p.status&&!['pending','indexed','ready','error','archived'].includes(p.status))throw Error('حالة المصدر غير صالحة')}
+  if(c==='sourceRegistry'){if(!p.sourceId||!/^[A-Za-z0-9_-]{2,128}$/.test(p.sourceId))throw Error('معرّف المصدر غير صالح');if(!p.name||p.name.length<2)throw Error('اسم المصدر مطلوب');if(p.path&&p.path.length>2000)throw Error('مسار المصدر طويل جدًا');if(p.status&&!['pending_review','published','rejected','pending','indexed','ready','error','archived'].includes(p.status))throw Error('حالة المصدر غير صالحة')}
   return p
 }
 export function initialValue(type,v){if(type==='checkbox')return!!v;if(type==='ids')return Array.isArray(v)?v.join(', '):String(v||'');return String(v??'')}
