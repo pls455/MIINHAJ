@@ -90,6 +90,10 @@ export async function setResourceActive(id, active) {
 
 export async function count(name, filters = {}) { return (await getCountFromServer(build(name, filters, 1))).data().count; }
 
+// Backward-compatible aliases used by the Admin data layer.
+export const save = saveResource;
+export const remove = removeResource;
+
 export const resourceRepository = {
   getResources: (filters = {}, size, cursor) => getPage('resources', { active: true, ...filters }, size, cursor),
   getResource: id => getOne('resources', id),
