@@ -1,122 +1,20 @@
 import { db } from '../services/firebase.js';
-import { collection, doc, getDoc, getDocs, query, where, orderBy, limit, startAfter, setDoc, addDoc, updateDoc, deleteDoc, serverTimestamp, getCountFromServer } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+import { collection, doc, getDoc, getDocs, query, where, orderBy, limit, startAfter, addDoc, updateDoc, deleteDoc, serverTimestamp, getCountFromServer } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
 import { writeAdminLog } from '../services/firebase/adminLogRepository.js';
 
-const PAGE_SIZE = 24;
-const MAX_PAGE_SIZE = 50;
-const normalize = (v) => String(v ?? '').trim();
-const clamp = (v) => Math.min(Math.max(Number(v) || PAGE_SIZE, 1), MAX_PAGE_SIZE);
-
-function build(name, filters = {}, size = PAGE_SIZE, cursor = null) {
-  const w = [];
-  if (filters.active !== undefined && filters.active !== null) w.push(where('active', '==', filters.active));
-  if (filters.status) w.push(where('status', '==', filters.status));
-  if (filters.branchId) w.push(where('branchIds', 'array-contains', filters.branchId));
-  if (filters.subjectId) w.push(where('subjectId', '==', filters.subjectId));
-  if (filters.categoryId) w.push(where('categoryId', '==', filters.categoryId));
-  if (filters.type) w.push(where('type', '==', filters.type));
-  if (filters.level) w.push(where('level', '==', filters.level));
-  if (filters.keyword) w.push(where('keywords', 'array-contains', normalize(filters.keyword)));
-  const search = normalize(filters.search);
-  const field = filters.searchField || 'title';
-  if (search) w.push(where(field, '>=', search), where(field, '<=', search + '\uf8ff'), orderBy(field));
-  else w.push(orderBy(filters.orderField || 'order', filters.sort === 'newest' ? 'desc' : 'asc'));
-  if (cursor) w.push(startAfter(cursor));
-  w.push(limit(clamp(size)));
-  return query(collection(db, name), ...w);
-}
-
-export async function getPage(name, filters = {}, size = PAGE_SIZE, cursor = null) {
-  const snapshot = await getDocs(build(name, filters, size, cursor));
-  return { rows: snapshot.docs.map(d => ({ id: d.id, ...d.data() })), nextCursor: snapshot.docs.at(-1) || null, hasMore: snapshot.docs.length === clamp(size) };
-}
-export async function getOne(name, id) { const snapshot = await getDoc(doc(db, name, id)); return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null; }
-export async function getAllSmall(name, size = 100) { const safeSize = Math.min(Math.max(Number(size) || 1, 1), 100); const snapshot = await getDocs(query(collection(db, name), where('active', '==', true), orderBy('order'), limit(safeSize))); return snapshot.docs.map(d => ({ id: d.id, ...d.data() })); }
-
-function validateResource(input) {
-  const data = { ...input };
-  data.title = normalize(data.title);
-  data.url = normalize(data.url);
-  data.description = normalize(data.description);
-  data.type = normalize(data.type);
-  data.categoryId = normalize(data.categoryId);
-  data.subjectId = normalize(data.subjectId);
-  data.branchIds = Array.isArray(data.branchIds) ? [...new Set(data.branchIds.map(normalize).filter(Boolean))] : [];
-  data.keywords = Array.isArray(data.keywords) ? [...new Set(data.keywords.map(normalize).filter(Boolean))] : [];
-  data.tags = Array.isArray(data.tags) ? [...new Set(data.tags.map(normalize).filter(Boolean))] : [];
-  if (!data.title) throw new Error('RESOURCE_TITLE_REQUIRED');
-  if (!data.url) throw new Error('RESOURCE_URL_REQUIRED');
-  let parsed;
-  try { parsed = new URL(data.url); } catch { throw new Error('RESOURCE_URL_INVALID'); }
-  if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('RESOURCE_URL_PROTOCOL');
-  if (!data.branchIds.length) throw new Error('RESOURCE_BRANCH_REQUIRED');
-  if (!data.subjectId) throw new Error('RESOURCE_SUBJECT_REQUIRED');
-  if (data.order !== undefined && (!Number.isFinite(Number(data.order)) || Number(data.order) < 0)) throw new Error('RESOURCE_ORDER_INVALID');
-  data.order = Number.isFinite(Number(data.order)) ? Number(data.order) : 0;
-  data.active = data.active !== false;
-  return data;
-}
-
-async function ensureUniqueUrl(url, exceptId = null) {
-  const snapshot = await getDocs(query(collection(db, 'resources'), where('url', '==', url), limit(2)));
-  if (snapshot.docs.some(d => d.id !== exceptId)) throw new Error('RESOURCE_URL_DUPLICATE');
-}
-
-export async function saveResource(id, input) {
-  const data = validateResource(input);
-  await ensureUniqueUrl(data.url, id || null);
-  if (id) {
-    await updateDoc(doc(db, 'resources', id), { ...data, updatedAt: serverTimestamp() });
-    await writeAdminLog({ action: 'update', collectionName: 'resources', targetId: id, details: { title: data.title } });
-    return id;
-  }
-  const result = await addDoc(collection(db, 'resources'), { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-  await writeAdminLog({ action: 'create', collectionName: 'resources', targetId: result.id, details: { title: data.title, url: data.url } });
-  return result.id;
-}
-
-export async function removeResource(id) {
-  const existing = await getOne('resources', id);
-  if (!existing) throw new Error('RESOURCE_NOT_FOUND');
-  await deleteDoc(doc(db, 'resources', id));
-  await writeAdminLog({ action: 'delete', collectionName: 'resources', targetId: id, details: { title: existing.title || '' } });
-}
-
-export async function setResourceActive(id, active) {
-  const value = Boolean(active);
-  await updateDoc(doc(db, 'resources', id), { active: value, updatedAt: serverTimestamp() });
-  await writeAdminLog({ action: value ? 'activate' : 'deactivate', collectionName: 'resources', targetId: id, details: { active: value } });
-}
-
-export async function count(name, filters = {}) { return (await getCountFromServer(build(name, filters, 1))).data().count; }
-
-// Admin compatibility exports. Keep these named exports because js/admin/data.js imports them directly.
-export const save = saveResource;
-export const remove = removeResource;
-
-export const resourceRepository = {
-  getResources: (filters = {}, size, cursor) => getPage('resources', { active: true, ...filters }, size, cursor),
-  getResource: id => getOne('resources', id),
-  getResourcesBySubject: (id, size, cursor) => getPage('resources', { active: true, subjectId: id }, size, cursor),
-  getResourcesByBranch: (id, size, cursor) => getPage('resources', { active: true, branchId: id }, size, cursor),
-  getResourcesByCategory: (id, size, cursor) => getPage('resources', { active: true, categoryId: id }, size, cursor),
-  searchResources: (filters = {}, size, cursor) => getPage('resources', { active: true, ...filters }, size, cursor),
-  saveResource,
-  removeResource,
-  setResourceActive,
-  validateResource
-};
-
-export const repositories = {
-  branches: { page: (f, s, c) => getPage('branches', { active: true, ...f }, s, c) },
-  subjects: { page: (f, s, c) => getPage('subjects', { active: true, ...f }, s, c) },
-  categories: { page: (f, s, c) => getPage('categories', { active: true, ...f }, s, c) },
-  resources: resourceRepository,
-  foundations: { page: (f, s, c) => getPage('foundations', { active: true, ...f }, s, c) },
-  solutions: { page: (f, s, c) => getPage('solutions', { active: true, ...f }, s, c) },
-  flashcards: { page: (f, s, c) => getPage('flashcards', { active: true, ...f }, s, c) },
-  suggestions: { page: (f, s, c) => getPage('suggestions', f, s, c) },
-  reports: { page: (f, s, c) => getPage('problemReports', f, s, c) },
-  templates: { page: (f, s, c) => getPage('templates', f, s, c) },
-  sourceRegistry: { page: (f, s, c) => getPage('sourceRegistry', f, s, c) }
-};
+const PAGE_SIZE=24,MAX_PAGE_SIZE=50,normalize=v=>String(v??'').trim(),clamp=v=>Math.min(Math.max(Number(v)||PAGE_SIZE,1),MAX_PAGE_SIZE);
+function constraints(f={}){const w=[];if(f.active!==undefined&&f.active!==null)w.push(where('active','==',f.active));if(f.status)w.push(where('status','==',f.status));if(f.branchId)w.push(where('branchIds','array-contains',f.branchId));if(f.subjectId)w.push(where('subjectId','==',f.subjectId));if(f.categoryId)w.push(where('categoryId','==',f.categoryId));if(f.type)w.push(where('type','==',f.type));if(f.level)w.push(where('level','==',f.level));if(f.keyword)w.push(where('keywords','array-contains',normalize(f.keyword)));return w}
+function build(name,f={},size=PAGE_SIZE,cursor=null,ordered=true){const w=constraints(f),search=normalize(f.search),field=f.searchField||'title';if(ordered){if(search)w.push(where(field,'>=',search),where(field,'<=',search+'\uf8ff'),orderBy(field));else w.push(orderBy(f.orderField||'order',f.sort==='newest'?'desc':'asc'));if(cursor)w.push(startAfter(cursor))}else if(search)w.push(where(field,'>=',search),where(field,'<=',search+'\uf8ff'));w.push(limit(clamp(size)));return query(collection(db,name),...w)}
+function sortRows(rows,f={}){const field=f.orderField||'order',dir=f.sort==='newest'?-1:1;return [...rows].sort((a,b)=>{const av=a[field]??0,bv=b[field]??0;if(av<bv)return-1*dir;if(av>bv)return 1*dir;return String(a.id).localeCompare(String(b.id))})}
+export async function getPage(name,f={},size=PAGE_SIZE,cursor=null){try{const s=await getDocs(build(name,f,size,cursor,true));return{rows:s.docs.map(d=>({id:d.id,...d.data()})),nextCursor:s.docs.at(-1)||null,hasMore:s.docs.length===clamp(size)}}catch(e){console.warn('[repository] fallback query',e);const s=await getDocs(build(name,f,size,null,false));let rows=s.docs.map(d=>({id:d.id,...d.data()}));const q=normalize(f.search).toLocaleLowerCase('ar'),field=f.searchField||'title';if(q)rows=rows.filter(x=>String(x[field]??'').toLocaleLowerCase('ar').includes(q));return{rows:sortRows(rows,f),nextCursor:null,hasMore:false}}}
+export async function getOne(name,id){const s=await getDoc(doc(db,name,id));return s.exists()?{id:s.id,...s.data()}:null}
+export async function getAllSmall(name,size=100){const n=Math.min(Math.max(Number(size)||1,1),100);try{const s=await getDocs(query(collection(db,name),orderBy('order'),limit(n)));return s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.active!==false)}catch{const s=await getDocs(query(collection(db,name),limit(n)));return s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.active!==false).sort((a,b)=>(Number(a.order)||0)-(Number(b.order)||0))}}
+function validateResource(i){const d={...i};d.title=normalize(d.title);d.url=normalize(d.url);d.description=normalize(d.description);d.type=normalize(d.type);d.categoryId=normalize(d.categoryId);d.subjectId=normalize(d.subjectId);d.branchIds=Array.isArray(d.branchIds)?[...new Set(d.branchIds.map(normalize).filter(Boolean))]:[];d.keywords=Array.isArray(d.keywords)?[...new Set(d.keywords.map(normalize).filter(Boolean))]:[];d.tags=Array.isArray(d.tags)?[...new Set(d.tags.map(normalize).filter(Boolean))]:[];if(!d.title)throw Error('RESOURCE_TITLE_REQUIRED');if(!d.url)throw Error('RESOURCE_URL_REQUIRED');let u;try{u=new URL(d.url)}catch{throw Error('RESOURCE_URL_INVALID')}if(!['http:','https:'].includes(u.protocol))throw Error('RESOURCE_URL_PROTOCOL');if(!d.branchIds.length)throw Error('RESOURCE_BRANCH_REQUIRED');if(!d.subjectId)throw Error('RESOURCE_SUBJECT_REQUIRED');d.order=Number.isFinite(Number(d.order))?Number(d.order):0;d.active=d.active!==false;return d}
+async function ensureUniqueUrl(url,exceptId=null){const s=await getDocs(query(collection(db,'resources'),where('url','==',url),limit(2)));if(s.docs.some(d=>d.id!==exceptId))throw Error('RESOURCE_URL_DUPLICATE')}
+export async function saveResource(id,input){const d=validateResource(input);await ensureUniqueUrl(d.url,id||null);if(id){await updateDoc(doc(db,'resources',id),{...d,updatedAt:serverTimestamp()});await writeAdminLog({action:'update',collectionName:'resources',targetId:id,details:{title:d.title}});return id}const r=await addDoc(collection(db,'resources'),{...d,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await writeAdminLog({action:'create',collectionName:'resources',targetId:r.id,details:{title:d.title,url:d.url}});return r.id}
+export async function removeResource(id){const e=await getOne('resources',id);if(!e)throw Error('RESOURCE_NOT_FOUND');await deleteDoc(doc(db,'resources',id));await writeAdminLog({action:'delete',collectionName:'resources',targetId:id,details:{title:e.title||''}})}
+export async function setResourceActive(id,active){const v=Boolean(active);await updateDoc(doc(db,'resources',id),{active:v,updatedAt:serverTimestamp()});await writeAdminLog({action:v?'activate':'deactivate',collectionName:'resources',targetId:id,details:{active:v}})}
+export async function count(name,f={}){try{return(await getCountFromServer(query(collection(db,name),...constraints(f)))).data().count}catch{const s=await getDocs(query(collection(db,name),...constraints(f),limit(500)));return s.docs.length}}
+export const save=saveResource,remove=removeResource;
+export const resourceRepository={getResources:(f={},s,c)=>getPage('resources',{active:true,...f},s,c),getResource:id=>getOne('resources',id),getResourcesBySubject:(id,s,c)=>getPage('resources',{active:true,subjectId:id},s,c),getResourcesByBranch:(id,s,c)=>getPage('resources',{active:true,branchId:id},s,c),getResourcesByCategory:(id,s,c)=>getPage('resources',{active:true,categoryId:id},s,c),searchResources:(f={},s,c)=>getPage('resources',{active:true,...f},s,c),saveResource,removeResource,setResourceActive,validateResource};
+export const repositories={branches:{page:(f,s,c)=>getPage('branches',{active:true,...f},s,c)},subjects:{page:(f,s,c)=>getPage('subjects',{active:true,...f},s,c)},categories:{page:(f,s,c)=>getPage('categories',{active:true,...f},s,c)},resources:resourceRepository,foundations:{page:(f,s,c)=>getPage('foundations',{active:true,...f},s,c)},solutions:{page:(f,s,c)=>getPage('solutions',{active:true,...f},s,c)},flashcards:{page:(f,s,c)=>getPage('flashcards',{active:true,...f},s,c)},suggestions:{page:(f,s,c)=>getPage('suggestions',f,s,c)},reports:{page:(f,s,c)=>getPage('problemReports',f,s,c)},templates:{page:(f,s,c)=>getPage('templates',f,s,c)},sourceRegistry:{page:(f,s,c)=>getPage('sourceRegistry',f,s,c)}};
