@@ -20,12 +20,14 @@ function validate(input) {
   return data;
 }
 
-export async function getFlashcards({ pageSize = 24, cursor = null, branchId = null, subjectId = null } = {}) {
+export async function getFlashcards({ pageSize = 24, cursor = null, branchId = null, subjectId = null, includeInactive = false } = {}) {
   const clauses = [];
   if (branchId) clauses.push(where('branchId', '==', branchId));
   if (subjectId) clauses.push(where('subjectId', '==', subjectId));
-  clauses.push(where('active', '==', true), orderBy('order', 'asc'), limit(clamp(pageSize)));
-  if (cursor) clauses.splice(clauses.length - 1, 0, startAfter(cursor));
+  if (!includeInactive) clauses.push(where('active', '==', true));
+  clauses.push(orderBy('order', 'asc'));
+  if (cursor) clauses.push(startAfter(cursor));
+  clauses.push(limit(clamp(pageSize)));
   const snapshot = await getDocs(query(collection(db, NAME), ...clauses));
   return { items: snapshot.docs.map(d => ({ id: d.id, ...d.data() })), nextCursor: snapshot.docs.at(-1) || null };
 }
