@@ -32,11 +32,17 @@ function open(item = null) {
 function close() { if ($('card-dialog').open) $('card-dialog').close(); editingId = null; }
 async function load() {
   if (loading) return; loading = true; $('status').textContent = 'جاري تحميل البطاقات...';
-  try { const r = await getFlashcards({ pageSize: 24, cursor }); render(r.items); const p=$('pagination'); p.replaceChildren(); const next=document.createElement('button'); next.className='button'; next.textContent='التالي'; next.disabled=!r.nextCursor; next.onclick=async()=>{cursor=r.nextCursor;await load()}; p.append(next); $('status').textContent=''; }
-  catch (e) { console.error('[admin/flashcards.load]', e); $('status').textContent='تعذر تحميل البطاقات.'; $('status').className='message error'; }
-  finally { loading=false; }
+  try {
+    const r = await getFlashcards({ pageSize: 24, cursor, includeInactive: true });
+    render(r.items);
+    const p = $('pagination'); p.replaceChildren();
+    const next = document.createElement('button'); next.className = 'button'; next.textContent = 'التالي'; next.disabled = !r.nextCursor;
+    next.onclick = async () => { cursor = r.nextCursor; await load(); };
+    p.append(next); $('status').textContent = '';
+  } catch (e) { console.error('[admin/flashcards.load]', e); $('status').textContent = 'تعذر تحميل البطاقات.'; $('status').className = 'message error'; }
+  finally { loading = false; }
 }
-async function remove(item) { if (!confirm(`تأكيد حذف البطاقة «${item.question || ''}»؟`)) return; try { await deleteFlashcard(item.id); cursor=null; await load(); } catch(e) { console.error('[admin/flashcards.delete]',e); alert('تعذر الحذف.'); } }
+async function remove(item) { if (!confirm(`تأكيد حذف البطاقة «${item.question || ''}»؟`)) return; try { await deleteFlashcard(item.id); cursor = null; await load(); } catch(e) { console.error('[admin/flashcards.delete]',e); alert('تعذر الحذف.'); } }
 $('add-card').onclick=()=>open(); $('cancel').onclick=close;
 $('card-form').addEventListener('submit', async event => { event.preventDefault(); const order=Number($('order').value); if(!$('question').value.trim()||!$('answer').value.trim()) return alert('السؤال والإجابة مطلوبان.'); if(!$('branchId').value.trim()||!$('subjectId').value.trim()) return alert('الفرع والمادة مطلوبان.'); if(!Number.isInteger(order)||order<0)return alert('الترتيب غير صحيح.'); const data={question:$('question').value.trim(),answer:$('answer').value.trim(),explanation:$('explanation').value.trim(),branchId:$('branchId').value.trim(),subjectId:$('subjectId').value.trim(),order,active:$('active').checked}; try { if(editingId) await updateFlashcard(editingId,data); else await createFlashcard(data); close(); cursor=null; await load(); } catch(e){console.error('[admin/flashcards.save]',e);alert('تعذر حفظ البطاقة. تحقق من البيانات والصلاحيات.');} });
 await load();
