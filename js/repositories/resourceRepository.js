@@ -90,7 +90,7 @@ export async function setResourceActive(id, active) {
 
 export async function count(name, filters = {}) { return (await getCountFromServer(build(name, filters, 1))).data().count; }
 
-// Backward-compatible aliases used by the Admin data layer.
+// Admin compatibility exports. Keep these named exports because js/admin/data.js imports them directly.
 export const save = saveResource;
 export const remove = removeResource;
 
