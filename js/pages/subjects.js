@@ -11,7 +11,8 @@ let branchRows = [], cursor = null;
 function renderBranches() {
   branch.replaceChildren(new Option('كل الفروع', ''));
   branchRows.forEach(x => branch.append(new Option(x.name || 'بدون اسم', x.id)));
-  branch.value = qs.get('branch') || '';
+  const requestedBranch = qs.get('branch') || '';
+  branch.value = branchRows.some(x => x.id === requestedBranch) ? requestedBranch : '';
 }
 
 async function loadBranches() {
@@ -21,17 +22,21 @@ async function loadBranches() {
   renderBranches();
 }
 
+function matchesBranch(subject, branchId) {
+  if (!branchId) return true;
+  const ids = Array.isArray(subject.branchIds) ? subject.branchIds : [];
+  return ids.map(String).includes(String(branchId)) || String(subject.branchId || '') === String(branchId);
+}
+
 async function loadSubjects(reset = true) {
   if (reset) cursor = null;
   list.innerHTML = '<div class="loading">جاري تحميل المواد...</div>';
   try {
     const { getPage } = await import('../repositories/resourceRepository.js');
-    const filters = { active: true };
-    if (branch.value) filters.branchId = branch.value;
-    const page = await getPage('subjects', filters, 24, cursor);
-    list.replaceChildren();
+    const page = await getPage('subjects', { active: true }, 50, cursor);
     const q = search.value.trim().toLocaleLowerCase('ar');
-    const rows = q ? page.rows.filter(x => `${x.name || ''} ${x.description || ''}`.toLocaleLowerCase('ar').includes(q)) : page.rows;
+    const rows = page.rows.filter(x => matchesBranch(x, branch.value) && (!q || `${x.name || ''} ${x.description || ''}`.toLocaleLowerCase('ar').includes(q)));
+    list.replaceChildren();
     if (!rows.length) list.innerHTML = '<div class="empty">لا توجد مواد مطابقة.</div>';
     rows.forEach(x => {
       const card = document.createElement('a'); card.className = 'card subject-card';
