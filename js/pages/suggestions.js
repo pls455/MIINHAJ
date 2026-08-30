@@ -1,8 +1,7 @@
 import { mountShell } from '../components/layout.js';
 import { createSuggestion } from '../repositories/suggestionRepository.js';
+import { getPage } from '../repositories/resourceRepository.js';
 import { setMessage, setBusy } from '../core/utils.js';
-import { getBranches } from '../repositories/branchRepository.js';
-import { getSubjects } from '../repositories/subjectRepository.js';
 
 mountShell('إرسال اقتراح', `
   <section class="page-header">
@@ -44,12 +43,21 @@ const subjectSelect = document.getElementById('subject');
 
 async function loadAcademicOptions() {
   try {
-    const [branches, subjects] = await Promise.all([getBranches({ pageSize: 100 }), getSubjects({ pageSize: 100 })]);
-    for (const item of branches.items || []) {
-      const option = document.createElement('option'); option.value = item.id; option.textContent = item.name || item.title || item.id; branchSelect.append(option);
+    const [branchPage, subjectPage] = await Promise.all([
+      getPage('branches', { active: true }, 100),
+      getPage('subjects', { active: true }, 100)
+    ]);
+    for (const item of branchPage.rows || []) {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.name || item.title || item.id;
+      branchSelect.append(option);
     }
-    for (const item of subjects.items || []) {
-      const option = document.createElement('option'); option.value = item.id; option.textContent = item.name || item.title || item.id; subjectSelect.append(option);
+    for (const item of subjectPage.rows || []) {
+      const option = document.createElement('option');
+      option.value = item.id;
+      option.textContent = item.name || item.title || item.id;
+      subjectSelect.append(option);
     }
   } catch (error) {
     console.error('[suggestions.options]', error);
