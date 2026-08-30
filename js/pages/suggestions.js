@@ -1,7 +1,8 @@
 import { mountShell } from '../components/layout.js';
-import { db } from '../services/firebase.js';
-import { collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+import { createSuggestion } from '../repositories/suggestionRepository.js';
 import { setMessage, setBusy } from '../core/utils.js';
+import { getBranches } from '../repositories/branchRepository.js';
+import { getSubjects } from '../repositories/subjectRepository.js';
 
 mountShell('إرسال اقتراح', `
   <section class="page-header">
@@ -15,7 +16,7 @@ mountShell('إرسال اقتراح', `
       <label>نوع المحتوى<select id="contentType"><option value="resource">📚 مصدر</option><option value="foundation">🧠 تأسيس</option></select></label>
       <label>اسمك (اختياري)<input id="studentName" maxlength="80" placeholder="اسم مستعار"></label>
     </div>
-    <label>العنوان *<input id="title" required maxlength="160" placeholder="اسم الكتاب أو الدرس"></label>
+    <label>العنوان *<input id="title" required maxlength="200" placeholder="اسم الكتاب أو الدرس"></label>
     <label>الرابط *<input id="url" type="url" required placeholder="https://example.com/"></label>
     <div class="form-grid">
       <label>الفرع *<select id="branch" required><option value="">اختر الفرع</option></select></label>
@@ -38,6 +39,23 @@ mountShell('إرسال اقتراح', `
 const form = document.getElementById('form');
 const typeSelect = document.getElementById('contentType');
 const foundationFields = document.getElementById('foundationFields');
+const branchSelect = document.getElementById('branch');
+const subjectSelect = document.getElementById('subject');
+
+async function loadAcademicOptions() {
+  try {
+    const [branches, subjects] = await Promise.all([getBranches({ pageSize: 100 }), getSubjects({ pageSize: 100 })]);
+    for (const item of branches.items || []) {
+      const option = document.createElement('option'); option.value = item.id; option.textContent = item.name || item.title || item.id; branchSelect.append(option);
+    }
+    for (const item of subjects.items || []) {
+      const option = document.createElement('option'); option.value = item.id; option.textContent = item.name || item.title || item.id; subjectSelect.append(option);
+    }
+  } catch (error) {
+    console.error('[suggestions.options]', error);
+    setMessage(document.getElementById('msg'), 'تعذر تحميل الفروع والمواد.', true);
+  }
+}
 
 typeSelect.addEventListener('change', () => foundationFields.classList.toggle('hidden', typeSelect.value !== 'foundation'));
 
@@ -46,28 +64,29 @@ form.addEventListener('submit', async (event) => {
   const btn = event.submitter;
   setBusy(btn, true);
   try {
-    await addDoc(collection(db, 'suggestions'), {
-      title: document.getElementById('title').value.trim(),
+    await createSuggestion({
+      title: document.getElementById('title').value,
       contentType: typeSelect.value,
-      studentName: document.getElementById('studentName').value.trim(),
-      url: document.getElementById('url').value.trim(),
-      branchId: document.getElementById('branch').value,
-      subjectId: document.getElementById('subject').value,
+      studentName: document.getElementById('studentName').value,
+      url: document.getElementById('url').value,
+      branchId: branchSelect.value,
+      subjectId: subjectSelect.value,
       level: document.getElementById('level').value,
       foundationType: document.getElementById('foundationType').value,
-      type: document.getElementById('type').value.trim(),
-      description: document.getElementById('description').value.trim(),
-      keywords: document.getElementById('keywords').value.trim().split(',').map(v => v.trim()).filter(Boolean),
-      status: 'pending',
-      createdAt: serverTimestamp()
+      type: document.getElementById('type').value,
+      description: document.getElementById('description').value,
+      keywords: document.getElementById('keywords').value.split(',')
     });
     setMessage(document.getElementById('msg'), 'تم إرسال الاقتراح للمراجعة.');
     form.reset();
     foundationFields.classList.add('hidden');
   } catch (error) {
-    console.error('suggestion submission failed', error);
-    setMessage(document.getElementById('msg'), 'تعذر إرسال الاقتراح. حاول مرة أخرى.', true);
+    console.error('[suggestions.submit]', error);
+    const message = error.message === 'SUGGESTION_URL_INVALID' ? 'الرابط يجب أن يبدأ بـ http أو https.' : 'تعذر إرسال الاقتراح. تحقق من البيانات والصلاحيات.';
+    setMessage(document.getElementById('msg'), message, true);
   } finally {
     setBusy(btn, false);
   }
 });
+
+await loadAcademicOptions();
