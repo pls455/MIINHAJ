@@ -23,7 +23,10 @@ service cloud.firestore {
     match /resources/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /foundations/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /solutions/{id} { allow read: if true; allow write: if contentAdmin(); }
-    match /flashcards/{id} { allow read: if true; allow write: if contentAdmin(); }
+    match /flashcards/{id} {
+      allow read: if contentAdmin() || resource.data.active == true;
+      allow write: if contentAdmin();
+    }
     match /curriculumUnits/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /templates/{id} { allow read: if contentAdmin(); allow create, update, delete: if contentAdmin(); }
     match /sourceRegistry/{id} { allow read: if reviewer(); allow create: if reviewer(); allow update, delete: if contentAdmin(); }
