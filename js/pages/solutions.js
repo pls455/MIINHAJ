@@ -1,5 +1,4 @@
 import { mountShell } from '../components/layout.js';
-import { repositories } from '../repositories/resourceRepository.js';
 import { escapeHtml, safeUrl } from '../core/utils.js';
 
 mountShell('الحلول', `
@@ -13,6 +12,9 @@ const more = document.getElementById('more');
 let cursor = null;
 let loading = false;
 let requestId = 0;
+let repositoriesPromise;
+
+function getRepositories() { return repositoriesPromise ??= import('../repositories/resourceRepository.js').then(m => m.repositories); }
 
 function render(rows, append = true) {
   const cards = rows.map(x => {
@@ -33,18 +35,15 @@ async function load(reset = false) {
   if (reset) { cursor = null; list.replaceChildren(); more.hidden = true; }
   status.textContent = 'جارٍ تحميل النتائج...';
   try {
+    const repositories = await getRepositories();
+    if (id !== requestId) return;
     const q = document.getElementById('search').value.trim();
     const r = await repositories.solutions.page(q ? { title: q } : {}, 20, cursor);
     if (id !== requestId) return;
-    render(r.rows, !reset);
-    cursor = r.nextCursor;
-    more.hidden = !r.hasMore;
+    render(r.rows, !reset); cursor = r.nextCursor; more.hidden = !r.hasMore;
     status.textContent = !list.children.length ? 'لا توجد حلول مطابقة.' : '';
-  } catch (error) {
-    if (id !== requestId) return;
-    console.error('[solutions]', error);
-    status.textContent = 'تعذر تحميل الحلول. حاول مرة أخرى.';
-  } finally { if (id === requestId) loading = false; }
+  } catch (error) { if (id !== requestId) return; console.error('[solutions]', error); status.textContent = 'تعذر تحميل الحلول. حاول مرة أخرى.'; }
+  finally { if (id === requestId) loading = false; }
 }
 
 document.getElementById('search').addEventListener('input', () => { clearTimeout(load.timer); load.timer = setTimeout(() => load(true), 300); });
