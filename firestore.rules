@@ -11,10 +11,7 @@ service cloud.firestore {
 
     match /admins/{uid} {
       allow get: if signedIn() && (request.auth.uid == uid || superAdmin());
-      allow list: if superAdmin();
-      allow create: if superAdmin();
-      allow update: if superAdmin();
-      allow delete: if false;
+      allow list: if superAdmin(); allow create, update: if superAdmin(); allow delete: if false;
     }
     match /branches/{id} { allow read: if true; allow write: if superAdmin(); }
     match /categories/{id} { allow read: if true; allow write: if superAdmin(); }
@@ -22,39 +19,37 @@ service cloud.firestore {
     match /resources/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /foundations/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /solutions/{id} { allow read: if true; allow write: if contentAdmin(); }
-    match /flashcards/{id} {
-      allow read: if contentAdmin() || resource.data.active == true;
-      allow write: if contentAdmin();
-    }
+    match /flashcards/{id} { allow read: if contentAdmin() || resource.data.active == true; allow write: if contentAdmin(); }
     match /curriculumUnits/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /templates/{id} { allow read: if contentAdmin(); allow create, update, delete: if contentAdmin(); }
     match /sourceRegistry/{id} { allow read: if reviewer(); allow create: if reviewer(); allow update, delete: if contentAdmin(); }
 
     match /suggestions/{id} {
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['title','description','url','resourceId','type','metadata','createdAt'])
-        && request.resource.data.title is string
-        && request.resource.data.title.size() > 0
-        && request.resource.data.title.size() <= 200
-        && (!('description' in request.resource.data) || request.resource.data.description is string)
-        && (!('url' in request.resource.data) || request.resource.data.url is string)
-        && (!('resourceId' in request.resource.data) || request.resource.data.resourceId is string)
-        && (!('type' in request.resource.data) || request.resource.data.type is string)
-        && (!('metadata' in request.resource.data) || request.resource.data.metadata is map)
-        && (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp);
+        && request.resource.data.keys().hasOnly(['title','contentType','studentName','url','branchId','subjectId','level','foundationType','type','description','keywords','status','createdAt','updatedAt'])
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200
+        && request.resource.data.contentType in ['resource','foundation']
+        && request.resource.data.url is string && request.resource.data.url.size() > 0
+        && request.resource.data.branchId is string && request.resource.data.subjectId is string
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt is timestamp;
       allow read: if reviewer();
-      allow update: if reviewer()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy','reviewerNote','updatedAt']);
+      allow update: if reviewer() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy','reviewerNote','updatedAt']);
       allow delete: if false;
     }
 
     match /problemReports/{id} {
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['text','title','description','email','name','url','resourceId','createdAt','type','metadata'])
-        && request.resource.data.text is string
-        && request.resource.data.text.size() > 0
-        && request.resource.data.text.size() <= 5000;
-      allow read, update, delete: if contentAdmin();
+        && request.resource.data.keys().hasOnly(['sourceId','sourceTitle','kind','description','status','createdAt'])
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 2000
+        && request.resource.data.kind is string
+        && request.resource.data.status == 'open'
+        && request.resource.data.createdAt is timestamp;
+      allow read: if contentAdmin();
+      allow update: if contentAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','adminNote','updatedAt']);
+      allow delete: if false;
     }
     match /adminLogs/{id} {
       allow read: if superAdmin();
