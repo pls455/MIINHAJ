@@ -1,5 +1,4 @@
 import { requireAuthenticatedAdmin, signOutUser } from '../services/firebase/auth.js';
-import { repositories, count } from '../repositories/resourceRepository.js';
 import { permissions } from '../services/firebase/permissions.js';
 
 const content = document.getElementById('adminContent');
@@ -16,9 +15,7 @@ function card(label, value) {
 
 function sectionLinks(admin) {
   const links = [];
-  if (permissions.review(admin.role)) {
-    links.push('<a class="admin-nav-card" href="suggestions.html">الاقتراحات والبلاغات</a>');
-  }
+  if (permissions.review(admin.role)) links.push('<a class="admin-nav-card" href="suggestions.html">الاقتراحات والبلاغات</a>');
   if (permissions.content(admin.role)) {
     links.push('<a class="admin-nav-card" href="resources.html">المصادر</a>');
     links.push('<a class="admin-nav-card" href="subjects.html">المواد</a>');
@@ -29,9 +26,7 @@ function sectionLinks(admin) {
     links.push('<a class="admin-nav-card" href="templates.html">Templates</a>');
     links.push('<a class="admin-nav-card" href="bulk-import.html">Bulk Import</a>');
   }
-  if (permissions.system(admin.role)) {
-    links.push('<a class="admin-nav-card" href="logs.html">سجلات الإدارة</a>');
-  }
+  if (permissions.system(admin.role)) links.push('<a class="admin-nav-card" href="logs.html">سجلات الإدارة</a>');
   return links.join('');
 }
 
@@ -40,6 +35,7 @@ async function load() {
     const { user, admin } = await requireAuthenticatedAdmin();
     identity.textContent = `${user.email || admin.email || 'حساب الإدارة'} • ${admin.role || 'reviewer'}`;
 
+    const { count } = await import('../repositories/resourceRepository.js');
     const [branches, subjects, categories, resources, foundations] = await Promise.all([
       count('branches', { active: true }),
       count('subjects', { active: true }),
