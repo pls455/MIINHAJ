@@ -18,20 +18,27 @@ export function footer() {
 }
 
 export function mountShell(title, content) {
+  const app = document.getElementById('app');
+  if (!app) throw new Error('Missing #app root');
   document.title = `${title} | مِنهَاج`;
-  document.getElementById('app').innerHTML = `${navbar()}<main class="container"><div class="page-head"><span class="eyebrow">مِنهَاج</span><h1>${escapeHtml(title)}</h1></div>${content}</main>${footer()}`;
+  const markup = `${navbar()}<main class="container"><div class="page-head"><span class="eyebrow">مِنهَاج</span><h1>${escapeHtml(title)}</h1></div>${content}</main>${footer()}`;
+  app.innerHTML = markup;
   const menu = document.querySelector('.menu-toggle');
   const nav = document.querySelector('#site-navigation');
   menu?.addEventListener('click', () => {
     const open = nav?.classList.toggle('open');
     menu.setAttribute('aria-expanded', String(Boolean(open)));
   });
-  const saved = localStorage.getItem('minhaj-theme');
-  if (saved) document.documentElement.dataset.theme = saved;
+  try {
+    const saved = localStorage.getItem('minhaj-theme');
+    if (saved) document.documentElement.dataset.theme = saved;
+  } catch (error) {
+    console.warn('[layout] theme restore skipped', error);
+  }
   document.querySelector('.theme-toggle')?.addEventListener('click', () => {
     const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
     document.documentElement.dataset.theme = next;
-    localStorage.setItem('minhaj-theme', next);
+    try { localStorage.setItem('minhaj-theme', next); } catch (error) { console.warn('[layout] theme save skipped', error); }
   });
 }
 
