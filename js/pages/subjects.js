@@ -10,15 +10,19 @@ let branchRows = [], cursor = null;
 
 function renderBranches() {
   branch.replaceChildren(new Option('كل الفروع', ''));
-  branchRows.forEach(x => branch.append(new Option(x.name || 'بدون اسم', x.id)));
-  const requestedBranch = qs.get('branch') || '';
-  branch.value = branchRows.some(x => x.id === requestedBranch) ? requestedBranch : '';
+  branchRows.forEach(x => branch.append(new Option(x.name || 'بدون اسم', String(x.id))));
+  const requestedBranch = String(qs.get('branch') || '');
+  branch.value = branchRows.some(x => String(x.id) === requestedBranch) ? requestedBranch : '';
 }
 
 async function loadBranches() {
-  const { getPage } = await import('../repositories/resourceRepository.js');
-  const page = await getPage('branches', { active: true }, 50);
-  branchRows = page.rows;
+  const { getAllSmall, getOne } = await import('../repositories/resourceRepository.js');
+  branchRows = await getAllSmall('branches', 100);
+  const requestedBranch = String(qs.get('branch') || '');
+  if (requestedBranch && !branchRows.some(x => String(x.id) === requestedBranch)) {
+    const requested = await getOne('branches', requestedBranch);
+    if (requested && requested.active !== false) branchRows.push(requested);
+  }
   renderBranches();
 }
 
@@ -33,7 +37,9 @@ async function loadSubjects(reset = true) {
   list.innerHTML = '<div class="loading">جاري تحميل المواد...</div>';
   try {
     const { getPage } = await import('../repositories/resourceRepository.js');
-    const page = await getPage('subjects', { active: true }, 50, cursor);
+    const filters = { active: true };
+    if (branch.value) filters.branchId = branch.value;
+    const page = await getPage('subjects', filters, 50, cursor);
     const q = search.value.trim().toLocaleLowerCase('ar');
     const rows = page.rows.filter(x => matchesBranch(x, branch.value) && (!q || `${x.name || ''} ${x.description || ''}`.toLocaleLowerCase('ar').includes(q)));
     list.replaceChildren();
