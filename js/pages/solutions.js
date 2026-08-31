@@ -1,9 +1,9 @@
 import { mountShell } from '../components/layout.js';
-import { escapeHtml, safeUrl } from '../core/utils.js';
+import { escapeHtml, safeUrl, debounce } from '../core/utils.js';
 
 mountShell('الحلول', `
   <section class="page-head"><span class="eyebrow">مِنهَاج</span><h1>الحلول</h1><p>ابحث عن الحلول والشروحات المتاحة للطلاب.</p></section>
-  <section class="card"><div class="toolbar"><input id="search" type="search" placeholder="ابحث في الحلول..." autocomplete="off"></div><div id="status" class="message" role="status"></div><div id="list" class="grid"></div><button id="more" class="button" hidden>تحميل المزيد</button></section>
+  <section class="card"><div class="toolbar"><input id="search" type="search" placeholder="ابحث في الحلول..." autocomplete="off"></div><div id="status" class="message" role="status" aria-live="polite"></div><div id="list" class="grid"></div><button id="more" class="button" hidden type="button">تحميل المزيد</button></section>
 `);
 
 const list = document.getElementById('list');
@@ -18,15 +18,23 @@ let seenIds = new Set();
 function getRepositories() { return repositoriesPromise ??= import('../repositories/resourceRepository.js').then(m => m.repositories); }
 
 function render(rows, append = true) {
-  const cards = rows.map(x => {
-    const title = x.title || x.question || 'حل';
-    const body = x.solution || x.answer || x.description || '';
-    const problem = x.problem ? `<p class="muted">${escapeHtml(x.problem)}</p>` : '';
-    const steps = Array.isArray(x.steps) ? `<ol>${x.steps.map(s => `<li>${escapeHtml(String(s))}</li>`).join('')}</ol>` : (x.steps ? `<p>${escapeHtml(x.steps)}</p>` : '');
+  const fragment = document.createDocumentFragment();
+  rows.forEach((x) => {
+    const article = document.createElement('article');
+    article.className = 'card';
+    const icon = document.createElement('span'); icon.className = 'card-icon'; icon.setAttribute('aria-hidden', 'true'); icon.textContent = '✅';
+    const title = document.createElement('h3'); title.textContent = x.title || x.question || 'حل';
+    article.append(icon, title);
+    if (x.problem) { const p = document.createElement('p'); p.className = 'muted'; p.textContent = x.problem; article.append(p); }
+    const body = document.createElement('p'); body.textContent = x.solution || x.answer || x.description || ''; article.append(body);
+    if (Array.isArray(x.steps)) {
+      const ol = document.createElement('ol'); x.steps.forEach(s => { const li = document.createElement('li'); li.textContent = String(s); ol.append(li); }); article.append(ol);
+    } else if (x.steps) { const p = document.createElement('p'); p.textContent = x.steps; article.append(p); }
     const url = safeUrl(x.url || '');
-    return `<article class="card"><span class="card-icon" aria-hidden="true">✅</span><h3>${escapeHtml(title)}</h3>${problem}<p>${escapeHtml(body)}</p>${steps}${url !== '#' ? `<a class="button" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">فتح المصدر</a>` : ''}</article>`;
-  }).join('');
-  if (append) list.insertAdjacentHTML('beforeend', cards); else list.innerHTML = cards;
+    if (url !== '#') { const a = document.createElement('a'); a.className = 'button'; a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = 'فتح المصدر'; article.append(a); }
+    fragment.append(article);
+  });
+  if (append) list.append(fragment); else list.replaceChildren(fragment);
 }
 
 async function load(reset = false) {
@@ -51,6 +59,6 @@ async function load(reset = false) {
   finally { if (id === requestId) loading = false; }
 }
 
-document.getElementById('search').addEventListener('input', () => { clearTimeout(load.timer); load.timer = setTimeout(() => load(true), 300); });
+document.getElementById('search').addEventListener('input', debounce(() => load(true), 300));
 more.addEventListener('click', () => load(false));
 load(true);
