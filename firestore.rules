@@ -22,7 +22,7 @@ service cloud.firestore {
     match /flashcards/{id} { allow read: if contentAdmin() || resource.data.active == true; allow write: if contentAdmin(); }
     match /curriculumUnits/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /templates/{id} { allow read: if contentAdmin(); allow create, update, delete: if contentAdmin(); }
-    match /sourceRegistry/{id} { allow read: if reviewer(); allow create: if reviewer(); allow update, delete: if contentAdmin(); }
+    match /sourceRegistry/{id} { allow read: if reviewer(); allow create, update, delete: if reviewer(); }
 
     match /suggestions/{id} {
       allow create: if signedIn()
@@ -33,9 +33,7 @@ service cloud.firestore {
         && request.resource.data.branchId is string && request.resource.data.subjectId is string
         && request.resource.data.status == 'pending'
         && request.resource.data.createdAt is timestamp;
-      allow read: if reviewer();
-      allow update: if reviewer() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy','reviewerNote','updatedAt']);
-      allow delete: if false;
+      allow read, update, delete: if reviewer();
     }
 
     match /problemReports/{id} {
@@ -47,9 +45,7 @@ service cloud.firestore {
         && request.resource.data.kind is string
         && request.resource.data.status == 'open'
         && request.resource.data.createdAt is timestamp;
-      allow read: if contentAdmin();
-      allow update: if contentAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','adminNote','updatedAt']);
-      allow delete: if false;
+      allow read, update, delete: if reviewer();
     }
     match /adminLogs/{id} {
       allow read: if superAdmin();
