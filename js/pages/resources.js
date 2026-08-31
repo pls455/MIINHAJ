@@ -1,11 +1,11 @@
 import { mountShell } from '../components/layout.js';
 import { resourceCard } from '../components/resourceCard.js';
-import { escapeHtml, qs, debounce } from '../core/utils.js';
+import { qs, debounce } from '../core/utils.js';
 
 mountShell('المصادر', `
   <div id="resource-filters" class="toolbar"></div>
   <div id="resource-list" class="grid" aria-live="polite"></div>
-  <button id="moreResources" class="button" hidden>تحميل المزيد</button>
+  <button id="moreResources" class="button" hidden type="button">تحميل المزيد</button>
 `);
 
 const controls = document.getElementById('resource-filters');
@@ -16,9 +16,7 @@ let busy = false;
 let repositoryPromise;
 let seenIds = new Set();
 
-function getRepository() {
-  return repositoryPromise ??= import('../repositories/resourceRepository.js');
-}
+function getRepository() { return repositoryPromise ??= import('../repositories/resourceRepository.js'); }
 
 function filters() {
   return {
@@ -49,24 +47,37 @@ function appendRows(rows) {
   });
 }
 
+async function buildControls(getAllSmall) {
+  const [branches, subjects, categories] = await Promise.all([
+    getAllSmall('branches'), getAllSmall('subjects'), getAllSmall('categories')
+  ]);
+  controls.replaceChildren();
+  const search = document.createElement('input');
+  search.id = 'resourceSearch'; search.type = 'search'; search.placeholder = 'ابحث بالعنوان...'; search.setAttribute('aria-label', 'بحث بالمصادر');
+  const branch = document.createElement('select'); branch.id = 'branchFilter'; branch.setAttribute('aria-label', 'الفرع');
+  const subject = document.createElement('select'); subject.id = 'subjectFilter'; subject.setAttribute('aria-label', 'المادة');
+  const category = document.createElement('select'); category.id = 'categoryFilter'; category.setAttribute('aria-label', 'التصنيف');
+  branch.append(new Option('كل الفروع', '')); subject.append(new Option('كل المواد', '')); category.append(new Option('كل التصنيفات', ''));
+  branches.forEach(x => branch.append(new Option(x.name || '', String(x.id))));
+  subjects.forEach(x => subject.append(new Option(x.name || '', String(x.id))));
+  categories.forEach(x => category.append(new Option(x.name || '', String(x.id))));
+  controls.append(search, branch, subject, category);
+  branch.value = qs.get('branch') || '';
+  subject.value = qs.get('subject') || '';
+  category.value = qs.get('category') || '';
+  ['resourceSearch', 'branchFilter', 'subjectFilter', 'categoryFilter'].forEach((id) => {
+    document.getElementById(id).addEventListener('input', apply);
+    document.getElementById(id).addEventListener('change', apply);
+  });
+}
+
 async function load(reset = false) {
   if (busy) return;
   busy = true;
   if (reset) { cursor = null; seenIds = new Set(); setLoading(); more.hidden = true; }
   try {
     const { resourceRepository, getAllSmall } = await getRepository();
-    if (!controls.children.length) {
-      const [branches, subjects, categories] = await Promise.all([
-        getAllSmall('branches'), getAllSmall('subjects'), getAllSmall('categories')
-      ]);
-      controls.innerHTML = `<input id="resourceSearch" type="search" placeholder="ابحث بالعنوان..." aria-label="بحث بالمصادر"><select id="branchFilter" aria-label="الفرع"><option value="">كل الفروع</option>${branches.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name)}</option>`).join('')}</select><select id="subjectFilter" aria-label="المادة"><option value="">كل المواد</option>${subjects.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name)}</option>`).join('')}</select><select id="categoryFilter" aria-label="التصنيف"><option value="">كل التصنيفات</option>${categories.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name)}</option>`).join('')}</select>`;
-      document.getElementById('branchFilter').value = qs.get('branch') || '';
-      document.getElementById('subjectFilter').value = qs.get('subject') || '';
-      ['resourceSearch', 'branchFilter', 'subjectFilter', 'categoryFilter'].forEach((id) => {
-        document.getElementById(id).addEventListener('input', apply);
-        document.getElementById(id).addEventListener('change', apply);
-      });
-    }
+    if (!controls.children.length) await buildControls(getAllSmall);
     const result = await resourceRepository.searchResources(filters(), 24, cursor);
     if (reset) root.replaceChildren();
     const before = seenIds.size;
