@@ -5,20 +5,28 @@ service cloud.firestore {
     function admin(uid) { return /databases/$(database)/documents/admins/$(uid); }
     function activeAdmin() { return signedIn() && exists(admin(request.auth.uid)) && get(admin(request.auth.uid)).data.active == true; }
     function role() { return activeAdmin() ? get(admin(request.auth.uid)).data.role : ''; }
-    function reviewer() { return activeAdmin() && role() in ['reviewer','content_admin','superadmin','super_admin','admin']; }
-    function contentAdmin() { return activeAdmin() && role() in ['content_admin','superadmin','super_admin','admin']; }
-    function superAdmin() { return activeAdmin() && role() in ['superadmin','super_admin','admin']; }
+    function reviewer() { return activeAdmin() && role() in ['reviewer','content_admin','super_admin','superadmin','admin']; }
+    function contentAdmin() { return activeAdmin() && role() in ['content_admin','super_admin','superadmin','admin']; }
+    function superAdmin() { return activeAdmin() && role() in ['super_admin','superadmin','admin']; }
+    function canonicalRole() { return request.resource.data.role in ['reviewer','content_admin','super_admin']; }
+    function validAdminWrite() {
+      return request.resource.data.active is bool
+        && request.resource.data.role is string
+        && canonicalRole();
+    }
 
     match /admins/{uid} {
       allow get: if signedIn() && (request.auth.uid == uid || superAdmin());
-      allow list: if superAdmin(); allow create, update: if superAdmin(); allow delete: if false;
+      allow list: if superAdmin();
+      allow create, update: if superAdmin() && validAdminWrite();
+      allow delete: if false;
     }
     match /branches/{id} { allow read: if true; allow write: if superAdmin(); }
     match /categories/{id} { allow read: if true; allow write: if superAdmin(); }
     match /subjects/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /resources/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /foundations/{id} { allow read: if true; allow write: if contentAdmin(); }
-    match /solutions/{id} { allow read: if true; allow write: if contentAdmin(); }
+    match /solutions/{id} { allow read: true; allow write: if contentAdmin(); }
     match /flashcards/{id} { allow read: if contentAdmin() || resource.data.active == true; allow write: if contentAdmin(); }
     match /curriculumUnits/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /templates/{id} { allow read: if contentAdmin(); allow create, update, delete: if contentAdmin(); }
@@ -49,7 +57,9 @@ service cloud.firestore {
     }
     match /adminLogs/{id} {
       allow read: if superAdmin();
-      allow create: if activeAdmin() && request.resource.data.adminUid == request.auth.uid && request.resource.data.role == role();
+      allow create: if activeAdmin()
+        && request.resource.data.adminUid == request.auth.uid
+        && request.resource.data.role == role();
       allow update, delete: if false;
     }
     match /{document=**} { allow read, write: if false; }
