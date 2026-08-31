@@ -14,6 +14,7 @@ const more = document.getElementById('moreResources');
 let cursor = null;
 let busy = false;
 let repositoryPromise;
+let seenIds = new Set();
 
 function getRepository() {
   return repositoryPromise ??= import('../repositories/resourceRepository.js');
@@ -39,6 +40,8 @@ function setLoading() {
 
 function appendRows(rows) {
   rows.forEach((row) => {
+    if (seenIds.has(row.id)) return;
+    seenIds.add(row.id);
     const wrapper = document.createElement('div');
     wrapper.innerHTML = resourceCard(row);
     const node = wrapper.firstElementChild;
@@ -49,7 +52,7 @@ function appendRows(rows) {
 async function load(reset = false) {
   if (busy) return;
   busy = true;
-  if (reset) { cursor = null; setLoading(); }
+  if (reset) { cursor = null; seenIds = new Set(); setLoading(); more.hidden = true; }
   try {
     const { resourceRepository, getAllSmall } = await getRepository();
     if (!controls.children.length) {
@@ -66,9 +69,11 @@ async function load(reset = false) {
     }
     const result = await resourceRepository.searchResources(filters(), 24, cursor);
     if (reset) root.replaceChildren();
+    const before = seenIds.size;
     appendRows(result.rows);
     cursor = result.nextCursor;
-    more.hidden = !result.hasMore;
+    const added = seenIds.size - before;
+    more.hidden = !result.hasMore || (added === 0 && !result.nextCursor);
     if (!result.rows.length && !root.children.length) {
       const empty = document.createElement('div'); empty.className = 'empty'; empty.textContent = 'لا توجد مصادر مطابقة.'; root.append(empty);
     }
