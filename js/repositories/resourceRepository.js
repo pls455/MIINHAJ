@@ -39,7 +39,7 @@ async function getSubjectPageWithBranch(f, size) {
   const q = normalize(f.search).toLocaleLowerCase('ar');
   if (q) rows = rows.filter(x => `${x.name || ''} ${x.description || ''}`.toLocaleLowerCase('ar').includes(q));
   rows = sortRows(rows, f); const n = clamp(size);
-  return { rows: rows.slice(0, n), nextCursor: null, hasMore: false };
+  return { rows: rows.slice(0, n), nextCursor: null, hasMore: rows.length > n };
 }
 async function getPageInternal(name, f = {}, size = PAGE_SIZE, cursor = null) {
   const n = clamp(size);
