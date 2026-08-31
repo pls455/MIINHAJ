@@ -1,19 +1,22 @@
-const ALLOWED_ORIGINS = new Set((globalThis.ALLOWED_ORIGINS || '').split(',').map((v) => v.trim()).filter(Boolean));
 const MAX_BODY = 20000;
 const MAX_CONTEXT = 12000;
 
-function cors(origin) {
-  const allowed = ALLOWED_ORIGINS.size === 0 || ALLOWED_ORIGINS.has(origin) ? origin || '*' : '';
+function allowedOrigins(env) {
+  return new Set(String(env.ALLOWED_ORIGINS || 'https://pls455.github.io').split(',').map(v => v.trim()).filter(Boolean));
+}
+
+function cors(origin, allowed) {
   return {
-    'Access-Control-Allow-Origin': allowed,
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': allowed.has(origin) ? origin : '',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Vary': 'Origin'
   };
 }
 
-function json(data, status, origin) {
-  return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors(origin) } });
+function json(data, status, headers) {
+  return new Response(JSON.stringify(data), { status, headers });
 }
 
 function normalizeAction(value) {
@@ -30,48 +33,45 @@ function promptFor(action, data) {
 }
 
 async function callGemini(env, prompt) {
-  if (!env.GEMINI_API_KEY) throw new Error('AI service is not configured');
+  if (!env.GEMINI_API_KEY) { const e = new Error('AI service is not configured'); e.status = 503; throw e; }
   const model = env.GEMINI_MODEL || 'gemini-3.6-flash';
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), 15000);
   try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST', signal: controller.signal,
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.2 } })
     });
-    if (!response.ok) throw new Error(`Gemini HTTP ${response.status}`);
+    if (!response.ok) { const e = new Error(`Gemini HTTP ${response.status}`); e.status = response.status; throw e; }
     const body = await response.json();
-    const text = body?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
+    const text = body?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
     if (!text) throw new Error('Empty Gemini response');
-    try { return JSON.parse(text.replace(/^```json\s*|\s*```$/g, '')); } catch { throw new Error('Invalid Gemini JSON'); }
-  } finally { clearTimeout(timeout); }
+    try { return JSON.parse(text.replace(/^```json\s*|\s*```$/g, '')); } catch { throw Object.assign(new Error('Invalid Gemini JSON'), { status: 502 }); }
+  } finally { clearTimeout(timer); }
 }
 
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) });
-    if (new URL(request.url).pathname === '/health' && request.method === 'GET') return json({ ok: true, service: 'minhaj-ai' }, 200, origin);
-    if (request.method !== 'POST' || new URL(request.url).pathname !== '/ai') return json({ ok: false, error: 'Not found' }, 404, origin);
-    if (ALLOWED_ORIGINS.size && !ALLOWED_ORIGINS.has(origin)) return json({ ok: false, error: 'Origin not allowed' }, 403, origin);
-    if (!env.GEMINI_API_KEY) return json({ ok: false, error: 'AI service unavailable' }, 503, origin);
+    const allowed = allowedOrigins(env);
+    const headers = cors(origin, allowed);
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+    if (origin && !allowed.has(origin)) return json({ ok: false, error: 'Origin not allowed' }, 403, headers);
+    if (request.method !== 'POST' || new URL(request.url).pathname !== '/ai') return json({ ok: false, error: 'Not found' }, 404, headers);
+    const length = Number(request.headers.get('content-length') || 0);
+    if (length > MAX_BODY) return json({ ok: false, error: 'Request too large' }, 413, headers);
     let data;
-    try {
-      const length = Number(request.headers.get('content-length') || 0);
-      if (length > MAX_BODY) return json({ ok:false, error:'Request too large' }, 413, origin);
-      data = await request.json();
-    } catch { return json({ ok:false, error:'Invalid JSON' }, 400, origin); }
-    const action = normalizeAction(data.action);
-    if (!action) return json({ ok:false, error:'Invalid action' }, 400, origin);
-    if (action === 'ask' && !String(data.question || '').trim()) return json({ ok:false, error:'Question is required' }, 400, origin);
+    try { data = await request.json(); } catch { return json({ ok: false, error: 'Invalid JSON' }, 400, headers); }
+    const action = normalizeAction(data?.action);
+    if (!action) return json({ ok: false, error: 'Invalid action' }, 400, headers);
+    if (action === 'ask' && !String(data.question || '').trim()) return json({ ok: false, error: 'Question is required' }, 400, headers);
     try {
       const result = await callGemini(env, promptFor(action, data));
-      return json({ ok:true, result, ai:{ provider:'Gemini', model:env.GEMINI_MODEL || 'gemini-3.6-flash', action } }, 200, origin);
-    } catch (error) {
-      console.error(error);
-      const message = error?.name === 'AbortError' ? 'AI request timed out' : 'AI request failed';
-      return json({ ok:false, error:message }, 502, origin);
+      return json({ ok: true, result, ai: { provider: 'Gemini', model: env.GEMINI_MODEL || 'gemini-3.6-flash', action } }, 200, headers);
+    } catch (e) {
+      console.error('[ai]', e);
+      return json({ ok: false, error: e?.name === 'AbortError' ? 'AI request timed out' : 'AI request failed' }, e?.status >= 500 ? e.status : 502, headers);
     }
   }
 };
