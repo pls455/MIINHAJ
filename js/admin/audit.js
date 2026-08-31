@@ -11,6 +11,25 @@ export async function logAction(admin, action, targetCollection, targetId, detai
   } catch (e) { console.error('[adminLogs]', e); }
 }
 
+async function refId(collectionName, value) {
+  const s = String(value ?? '').trim();
+  if (!s) return '';
+  const snap = await getDocs(query(collection(db, collectionName), limit(2000)));
+  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(x => x.active !== false);
+  return rows.find(x => String(x.id) === s)?.id
+    || rows.find(x => String(x.stableId || '') === s)?.id
+    || rows.find(x => String(x.name || '').trim() === s)?.id
+    || '';
+}
+
+async function normalizeRegistry(current, id) {
+  const rawBranches = Array.isArray(current.branchIds) ? current.branchIds : (current.branchId ? [current.branchId] : []);
+  const branchIds = [...new Set((await Promise.all(rawBranches.map(v => refId('branches', v)))).filter(Boolean))];
+  const subjectId = await refId('subjects', current.subjectId || current.subject || current.subjectStableId || '');
+  const categoryId = await refId('categories', current.categoryId || current.category || current.categoryStableId || '');
+  return { branchIds, subjectId, categoryId, sourceId: current.sourceId || current.id || id };
+}
+
 export async function updateStatus(collectionName, id, status, admin) {
   const ref = doc(db, collectionName, id);
   const snap = await getDoc(ref);
@@ -21,30 +40,39 @@ export async function updateStatus(collectionName, id, status, admin) {
     if (!['pending_review', 'approved', 'rejected'].includes(status)) throw Error('حالة المراجعة غير صالحة.');
 
     if (status === 'approved') {
-      const existing = await getDocs(query(collection(db, 'resources'), where('url', '==', current.url || ''), limit(1)));
-      if (current.url && !existing.empty) throw Error('هذا المصدر موجود مسبقًا ضمن المصادر المنشورة.');
-      if (!current.url || !current.name || !current.subjectId || !Array.isArray(current.branchIds) || !current.branchIds.length) {
-        throw Error('لا يمكن اعتماد المصدر قبل اكتمال العنوان والرابط والفرع والمادة.');
+      const normalized = await normalizeRegistry(current, id);
+      const url = String(current.url || current.sourceUrl || current.link || '').trim();
+      const name = String(current.name || current.title || current.originalTitle || '').trim();
+      const existing = url ? await getDocs(query(collection(db, 'resources'), where('url', '==', url), limit(1))) : { empty: true };
+      if (!url || !name || !normalized.subjectId || !normalized.branchIds.length) {
+        throw Error('لا يمكن اعتماد المصدر قبل اكتمال العنوان والرابط والفرع والمادة. افتح التعديل وأكمل البيانات المطلوبة.');
       }
+      if (!existing.empty) throw Error('هذا المصدر موجود مسبقًا ضمن المصادر المنشورة.');
       const published = await addDoc(collection(db, 'resources'), {
-        title: current.name,
-        url: current.url,
+        title: name,
+        url,
         description: current.description || '',
         type: current.type || current.mimeType || 'resource',
-        subjectId: current.subjectId,
-        categoryId: current.categoryId || '',
-        branchIds: current.branchIds,
+        subjectId: normalized.subjectId,
+        categoryId: normalized.categoryId || '',
+        branchIds: normalized.branchIds,
         keywords: Array.isArray(current.keywords) ? current.keywords : [],
         tags: Array.isArray(current.tags) ? current.tags : [],
         author: current.author || '',
         order: Number(current.order) || 0,
         active: true,
-        sourceId: current.sourceId || current.id || id,
+        sourceId: normalized.sourceId,
         provider: current.provider || 'google_drive',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
       await updateDoc(ref, {
+        name,
+        title: name,
+        url,
+        branchIds: normalized.branchIds,
+        subjectId: normalized.subjectId,
+        categoryId: normalized.categoryId || '',
         status: 'published',
         needsReview: false,
         active: false,
