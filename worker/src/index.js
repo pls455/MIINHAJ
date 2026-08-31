@@ -1,77 +1,23 @@
 const MAX_BODY = 20000;
 const MAX_CONTEXT = 12000;
+const MAX_QUESTION = 3000;
+const ALLOWED_ACTIONS = new Set(['ask', 'classify', 'generate_questions', 'assess_level', 'study_plan']);
 
-function allowedOrigins(env) {
-  return new Set(String(env.ALLOWED_ORIGINS || 'https://pls455.github.io').split(',').map(v => v.trim()).filter(Boolean));
+function allowedOrigins(env) { return new Set(String(env.ALLOWED_ORIGINS || 'https://pls455.github.io').split(',').map(v => v.trim()).filter(Boolean)); }
+function cors(origin, allowed) { return { 'Content-Type':'application/json; charset=utf-8', 'Access-Control-Allow-Origin':allowed.has(origin)?origin:'', 'Access-Control-Allow-Methods':'POST, OPTIONS', 'Access-Control-Allow-Headers':'Content-Type', 'Vary':'Origin' }; }
+function json(data,status,headers){return new Response(JSON.stringify(data),{status,headers});}
+function text(value,max){return String(value??'').trim().slice(0,max);}
+function normalizeAction(value){return ALLOWED_ACTIONS.has(value)?value:null;}
+function promptFor(action,data){
+  const context=text(data.context,MAX_CONTEXT);
+  if(action==='ask')return `أنت مساعد "منهاج" التعليمي. أجب بالعربية بوضوح. استخدم السياق فقط عندما يكون متعلقًا بالسؤال، ولا تدّعِ قراءة محتوى غير موجود. السؤال: ${text(data.question,MAX_QUESTION)}\nالسياق: ${context||'لا يوجد'}\nأعد JSON فقط: {"answer":"...","confidence":0,"usedContext":true,"sources":[]}`;
+  if(action==='classify')return `صنّف مصدرًا تعليميًا اعتمادًا فقط على الأدلة. لا تخترع IDs أو معلومات. الاسم: ${text(data.name,500)}\nالمسار: ${text(data.path,2000)}\nالوصف: ${text(data.description,2000)}\nالملفات القريبة: ${JSON.stringify(Array.isArray(data.siblings)?data.siblings.slice(0,40):[])}\nأعد JSON فقط: {"branch":"غير محدد","subject":"غير محدد","category":"غير محدد","confidence":{"branch":0,"subject":0,"category":0,"overall":0},"evidence":[],"needsReview":true,"reason":"..."}`;
+  if(action==='generate_questions')return `أنشئ أسئلة من المحتوى فقط. المادة: ${text(data.subject,300)}. العدد: ${Math.min(Math.max(Number(data.count)||10,1),20)}. الصعوبة: ${text(data.difficulty||'متوسط',30)}. المحتوى: ${context}\nأعد JSON فقط: {"questions":[{"question":"...","type":"mcq|true_false|short","options":[],"answer":"...","explanation":"..."}]}`;
+  if(action==='assess_level')return `قيّم إجابات الطالب مقارنة بالأسئلة المقدمة فقط. المادة: ${text(data.subject,300)}\nالأسئلة: ${text(data.questions,9000)}\nالإجابات: ${text(data.answers,9000)}\nأعد JSON فقط: {"score":0,"level":"مبتدئ","strengths":[],"weaknesses":[],"recommendations":[]}`;
+  return `أنشئ خطة دراسة واقعية. المواد: ${text(data.subjects,2500)}. الأيام: ${Math.min(Math.max(Number(data.days)||7,1),30)}. ساعات يوميًا: ${Math.min(Math.max(Number(data.hoursPerDay)||2,0.5),12)}. المستوى: ${text(data.level||'متوسط',100)}. الهدف: ${text(data.goal||'تحسين التحصيل',1000)}. أعد JSON فقط: {"summary":"...","days":[],"tips":[]}`;
 }
-
-function cors(origin, allowed) {
-  return {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': allowed.has(origin) ? origin : '',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Vary': 'Origin'
-  };
-}
-
-function json(data, status, headers) {
-  return new Response(JSON.stringify(data), { status, headers });
-}
-
-function normalizeAction(value) {
-  return ['ask', 'classify', 'generate_questions', 'assess_level', 'study_plan'].includes(value) ? value : null;
-}
-
-function promptFor(action, data) {
-  const context = String(data.context || '').slice(0, MAX_CONTEXT);
-  if (action === 'ask') return `أنت مساعد "منهاج" التعليمي. أجب بالعربية بوضوح. استخدم السياق فقط عندما يكون متعلقًا بالسؤال، ولا تدّعِ قراءة محتوى غير موجود. السؤال: ${String(data.question || '').slice(0, 3000)}\nالسياق: ${context || 'لا يوجد'}\nأعد JSON فقط: {"answer":"...","confidence":0,"usedContext":true,"sources":[]}`;
-  if (action === 'classify') return `صنّف مصدرًا تعليميًا اعتمادًا فقط على الأدلة. لا تخترع IDs أو معلومات. الاسم: ${String(data.name || '').slice(0,500)}\nالمسار: ${String(data.path || '').slice(0,2000)}\nالوصف: ${String(data.description || '').slice(0,2000)}\nالملفات القريبة: ${JSON.stringify(Array.isArray(data.siblings) ? data.siblings.slice(0,40) : [])}\nأعد JSON فقط: {"branch":"غير محدد","subject":"غير محدد","category":"غير محدد","confidence":{"branch":0,"subject":0,"category":0,"overall":0},"evidence":[],"needsReview":true,"reason":"..."}`;
-  if (action === 'generate_questions') return `أنشئ أسئلة من المحتوى فقط. المادة: ${String(data.subject || '').slice(0,300)}. العدد: ${Math.min(Math.max(Number(data.count) || 10,1),20)}. الصعوبة: ${String(data.difficulty || 'متوسط').slice(0,30)}. المحتوى: ${context}\nأعد JSON فقط: {"questions":[{"question":"...","type":"mcq|true_false|short","options":[],"answer":"...","explanation":"..."}]}`;
-  if (action === 'assess_level') return `قيّم إجابات الطالب مقارنة بالأسئلة المقدمة فقط. المادة: ${String(data.subject || '').slice(0,300)}\nالأسئلة: ${String(data.questions || '').slice(0,9000)}\nالإجابات: ${String(data.answers || '').slice(0,9000)}\nأعد JSON فقط: {"score":0,"level":"مبتدئ","strengths":[],"weaknesses":[],"recommendations":[]}`;
-  return `أنشئ خطة دراسة واقعية. المواد: ${String(data.subjects || '').slice(0,2500)}. الأيام: ${Math.min(Math.max(Number(data.days)||7,1),30)}. ساعات يوميًا: ${Math.min(Math.max(Number(data.hoursPerDay)||2,0.5),12)}. المستوى: ${String(data.level||'متوسط').slice(0,100)}. الهدف: ${String(data.goal||'تحسين التحصيل').slice(0,1000)}. أعد JSON فقط: {"summary":"...","days":[],"tips":[]}`;
-}
-
-async function callGemini(env, prompt) {
-  if (!env.GEMINI_API_KEY) { const e = new Error('AI service is not configured'); e.status = 503; throw e; }
-  const model = env.GEMINI_MODEL || 'gemini-3.6-flash';
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: 'POST', signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json', temperature: 0.2 } })
-    });
-    if (!response.ok) { const e = new Error(`Gemini HTTP ${response.status}`); e.status = response.status; throw e; }
-    const body = await response.json();
-    const text = body?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
-    if (!text) throw new Error('Empty Gemini response');
-    try { return JSON.parse(text.replace(/^```json\s*|\s*```$/g, '')); } catch { throw Object.assign(new Error('Invalid Gemini JSON'), { status: 502 }); }
-  } finally { clearTimeout(timer); }
-}
-
-export default {
-  async fetch(request, env) {
-    const origin = request.headers.get('Origin') || '';
-    const allowed = allowedOrigins(env);
-    const headers = cors(origin, allowed);
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
-    if (origin && !allowed.has(origin)) return json({ ok: false, error: 'Origin not allowed' }, 403, headers);
-    if (request.method !== 'POST' || new URL(request.url).pathname !== '/ai') return json({ ok: false, error: 'Not found' }, 404, headers);
-    const length = Number(request.headers.get('content-length') || 0);
-    if (length > MAX_BODY) return json({ ok: false, error: 'Request too large' }, 413, headers);
-    let data;
-    try { data = await request.json(); } catch { return json({ ok: false, error: 'Invalid JSON' }, 400, headers); }
-    const action = normalizeAction(data?.action);
-    if (!action) return json({ ok: false, error: 'Invalid action' }, 400, headers);
-    if (action === 'ask' && !String(data.question || '').trim()) return json({ ok: false, error: 'Question is required' }, 400, headers);
-    try {
-      const result = await callGemini(env, promptFor(action, data));
-      return json({ ok: true, result, ai: { provider: 'Gemini', model: env.GEMINI_MODEL || 'gemini-3.6-flash', action } }, 200, headers);
-    } catch (e) {
-      console.error('[ai]', e);
-      return json({ ok: false, error: e?.name === 'AbortError' ? 'AI request timed out' : 'AI request failed' }, e?.status >= 500 ? e.status : 502, headers);
-    }
-  }
-};
+async function callGemini(env,prompt){
+  if(!env.GEMINI_API_KEY){const e=new Error('AI service is not configured');e.status=503;throw e;}
+  const model=env.GEMINI_MODEL||'gemini-3.6-flash'; const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),15000);
+  try{const response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0.2}})});if(!response.ok){const e=new Error(`Gemini HTTP ${response.status}`);e.status=response.status;throw e;}const body=await response.json();const value=body?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';if(!value)throw new Error('Empty Gemini response');try{return JSON.parse(value.replace(/^```json\s*|\s*```$/g,''));}catch{throw Object.assign(new Error('Invalid Gemini JSON'),{status:502});}}finally{clearTimeout(timer);}}
+export default {async fetch(request,env){const origin=request.headers.get('Origin')||'';const allowed=allowedOrigins(env);const headers=cors(origin,allowed);if(request.method==='OPTIONS')return new Response(null,{status:204,headers});if(origin&&!allowed.has(origin))return json({ok:false,error:'Origin not allowed'},403,headers);if(request.method!=='POST'||new URL(request.url).pathname!=='/ai')return json({ok:false,error:'Not found'},404,headers);const length=Number(request.headers.get('content-length')||0);if(length>MAX_BODY)return json({ok:false,error:'Request too large'},413,headers);let data;try{data=await request.json();}catch{return json({ok:false,error:'Invalid JSON'},400,headers);}if(!data||typeof data!=='object'||Array.isArray(data))return json({ok:false,error:'Invalid request body'},400,headers);const action=normalizeAction(data.action);if(!action)return json({ok:false,error:'Invalid action'},400,headers);if(action==='ask'&&!text(data.question,MAX_QUESTION))return json({ok:false,error:'Question is required'},400,headers);try{const result=await callGemini(env,promptFor(action,data));return json({ok:true,result,ai:{provider:'Gemini',model:env.GEMINI_MODEL||'gemini-3.6-flash',action}},200,headers);}catch(e){console.error('[ai]',e);return json({ok:false,error:e?.name==='AbortError'?'AI request timed out':'AI request failed'},e?.status>=500?e.status:502,headers);}}};
