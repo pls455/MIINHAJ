@@ -1,14 +1,22 @@
+import { getDoc, getDocs, doc, query, where, limit, collection, addDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
 import { db } from '../services/firebase.js';
-import { collection, addDoc, getDoc, getDocs, updateDoc, doc, query, where, limit, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+import { writeAdminLog } from '../services/firebase/adminLogRepository.js';
 
 export async function logAction(admin, action, targetCollection, targetId, details = '') {
+  // Keep one audit-log implementation so role normalization and the Firestore contract
+  // remain consistent across repositories and the admin UI.
+  const previous = { uid: admin?.uid || '', email: admin?.email || '' };
   try {
-    await addDoc(collection(db, 'adminLogs'), {
-      adminUid: admin?.uid || '', adminEmail: admin?.email || '', role: admin?.role || '',
-      action, collection: targetCollection, targetId: String(targetId || ''),
-      details: String(details || ''), timestamp: serverTimestamp(), createdAt: serverTimestamp()
+    await writeAdminLog({
+      action,
+      collectionName: targetCollection,
+      targetId,
+      details: { message: String(details || ''), actorUid: previous.uid, actorEmail: previous.email },
     });
-  } catch (e) { console.error('[adminLogs]', e); }
+  } catch (error) {
+    console.error('[adminLogs]', error);
+    throw error;
+  }
 }
 
 async function refId(collectionName, value) {
@@ -49,47 +57,22 @@ export async function updateStatus(collectionName, id, status, admin) {
       }
       if (!existing.empty) throw Error('هذا المصدر موجود مسبقًا ضمن المصادر المنشورة.');
       const published = await addDoc(collection(db, 'resources'), {
-        title: name,
-        url,
-        description: current.description || '',
-        type: current.type || current.mimeType || 'resource',
-        subjectId: normalized.subjectId,
-        categoryId: normalized.categoryId || '',
-        branchIds: normalized.branchIds,
-        keywords: Array.isArray(current.keywords) ? current.keywords : [],
-        tags: Array.isArray(current.tags) ? current.tags : [],
-        author: current.author || '',
-        order: Number(current.order) || 0,
-        active: true,
-        sourceId: normalized.sourceId,
-        provider: current.provider || 'google_drive',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        title: name, url, description: current.description || '', type: current.type || current.mimeType || 'resource',
+        subjectId: normalized.subjectId, categoryId: normalized.categoryId || '', branchIds: normalized.branchIds,
+        keywords: Array.isArray(current.keywords) ? current.keywords : [], tags: Array.isArray(current.tags) ? current.tags : [],
+        author: current.author || '', order: Number(current.order) || 0, active: true, sourceId: normalized.sourceId,
+        provider: current.provider || 'google_drive', createdAt: serverTimestamp(), updatedAt: serverTimestamp()
       });
       await updateDoc(ref, {
-        name,
-        title: name,
-        url,
-        branchIds: normalized.branchIds,
-        subjectId: normalized.subjectId,
-        categoryId: normalized.categoryId || '',
-        status: 'published',
-        needsReview: false,
-        active: false,
-        publishedResourceId: published.id,
-        publishedAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        name, title: name, url, branchIds: normalized.branchIds, subjectId: normalized.subjectId, categoryId: normalized.categoryId || '',
+        status: 'published', needsReview: false, active: false, publishedResourceId: published.id,
+        publishedAt: serverTimestamp(), updatedAt: serverTimestamp()
       });
       await logAction(admin, 'publish', collectionName, id, `نشر المصدر ${published.id}`);
       return;
     }
 
-    await updateDoc(ref, {
-      status,
-      needsReview: status === 'pending_review',
-      active: false,
-      updatedAt: serverTimestamp()
-    });
+    await updateDoc(ref, { status, needsReview: status === 'pending_review', active: false, updatedAt: serverTimestamp() });
     await logAction(admin, `status:${status}`, collectionName, id, status);
     return;
   }
