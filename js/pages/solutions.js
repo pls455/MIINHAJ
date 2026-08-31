@@ -13,6 +13,7 @@ let cursor = null;
 let loading = false;
 let requestId = 0;
 let repositoriesPromise;
+let seenIds = new Set();
 
 function getRepositories() { return repositoriesPromise ??= import('../repositories/resourceRepository.js').then(m => m.repositories); }
 
@@ -32,7 +33,7 @@ async function load(reset = false) {
   if (loading) return;
   const id = ++requestId;
   loading = true;
-  if (reset) { cursor = null; list.replaceChildren(); more.hidden = true; }
+  if (reset) { cursor = null; seenIds = new Set(); list.replaceChildren(); more.hidden = true; }
   status.textContent = 'جارٍ تحميل النتائج...';
   try {
     const repositories = await getRepositories();
@@ -40,7 +41,11 @@ async function load(reset = false) {
     const q = document.getElementById('search').value.trim();
     const r = await repositories.solutions.page(q ? { title: q } : {}, 20, cursor);
     if (id !== requestId) return;
-    render(r.rows, !reset); cursor = r.nextCursor; more.hidden = !r.hasMore;
+    const fresh = r.rows.filter(x => !seenIds.has(x.id));
+    fresh.forEach(x => seenIds.add(x.id));
+    render(fresh, !reset);
+    cursor = r.nextCursor;
+    more.hidden = !r.hasMore || (fresh.length === 0 && !r.nextCursor);
     status.textContent = !list.children.length ? 'لا توجد حلول مطابقة.' : '';
   } catch (error) { if (id !== requestId) return; console.error('[solutions]', error); status.textContent = 'تعذر تحميل الحلول. حاول مرة أخرى.'; }
   finally { if (id === requestId) loading = false; }
