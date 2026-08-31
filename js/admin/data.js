@@ -1,21 +1,21 @@
 import { getPage, save, remove, count } from '../repositories/resourceRepository.js';
 import { logAction } from './audit.js';
-import { hasRole } from '../services/firebase/adminCore.js';
+import { hasRole, ROLES } from '../services/firebase/adminCore.js';
 
 export const configs = {
-  branches:{label:'الفروع',role:'superadmin',searchField:'name',fields:{name:'text',stableId:'text',description:'textarea',icon:'text',order:'number',active:'checkbox'}},
-  subjects:{label:'المواد',role:'content_admin',searchField:'name',fields:{name:'text',stableId:'text',description:'textarea',branchIds:'ids',icon:'text',order:'number',active:'checkbox'}},
-  categories:{label:'التصنيفات',role:'superadmin',searchField:'name',fields:{name:'text',stableId:'text',description:'textarea',icon:'text',order:'number',active:'checkbox'}},
-  resources:{label:'المصادر',role:'content_admin',searchField:'title',fields:{title:'text',url:'url',description:'textarea',type:'text',subjectId:'text',categoryId:'text',branchIds:'ids',keywords:'ids',tags:'ids',author:'text',order:'number',active:'checkbox'}},
-  foundations:{label:'التأسيس',role:'content_admin',searchField:'title',fields:{title:'text',url:'url',description:'textarea',type:'text',level:'text',subjectId:'text',branchIds:'ids',keywords:'ids',author:'text',order:'number',active:'checkbox'}},
-  solutions:{label:'الحلول',role:'content_admin',searchField:'title',fields:{title:'text',category:'text',categoryName:'text',problem:'textarea',solution:'textarea',steps:'textarea',notes:'textarea',keywords:'ids',order:'number',status:'text',active:'checkbox'}},
-  flashcards:{label:'البطاقات',role:'content_admin',searchField:'question',fields:{question:'textarea',answer:'textarea',explanation:'textarea',subjectId:'text',branchId:'text',order:'number',active:'checkbox'}},
-  templates:{label:'قوالب المصادر',role:'content_admin',searchField:'name',fields:{name:'text',target:'text',description:'textarea',fields:'ids',instructions:'ids'}},
-  sourceRegistry:{label:'سجل المصادر',role:'reviewer',writeRole:'reviewer',searchField:'name',orderField:'createdAt',fields:{sourceId:'text',name:'text',title:'text',url:'url',description:'textarea',path:'text',mimeType:'text',status:'text',branchIds:'ids',subjectId:'text',categoryId:'text',keywords:'ids',tags:'ids',needsReview:'checkbox',provider:'text',createdByEmail:'email',publishedResourceId:'text'}},
-  suggestions:{label:'الاقتراحات',role:'reviewer',writeRole:'reviewer',searchField:'title',orderField:'createdAt',fields:{title:'text',url:'url',description:'textarea',contentType:'text',status:'text',createdBy:'text',studentName:'text',branchId:'text',subjectId:'text',level:'text',foundationType:'text',type:'text',keywords:'ids',reviewedBy:'text',reviewerNote:'textarea'}},
-  problemReports:{label:'البلاغات',role:'reviewer',writeRole:'reviewer',searchField:'sourceTitle',orderField:'createdAt',fields:{sourceId:'text',sourceTitle:'text',sourceUrl:'url',kind:'text',description:'textarea',status:'text',createdBy:'text',adminNote:'textarea'}},
-  admins:{label:'المشرفون',role:'superadmin',searchField:'email',orderField:'createdAt',fields:{email:'email',role:'text',active:'checkbox'}},
-  adminLogs:{label:'سجل الإدارة',role:'superadmin',readOnly:true,searchField:'collection',orderField:'createdAt',fields:{action:'text',collection:'text',targetId:'text',details:'textarea',adminUid:'text',adminEmail:'email',role:'text'}}
+  branches:{label:'الفروع',role:ROLES.SUPER_ADMIN,searchField:'name',fields:{name:'text',stableId:'text',description:'textarea',icon:'text',order:'number',active:'checkbox'}},
+  subjects:{label:'المواد',role:ROLES.CONTENT_ADMIN,searchField:'name',fields:{name:'text',stableId:'text',description:'textarea',branchIds:'ids',icon:'text',order:'number',active:'checkbox'}},
+  categories:{label:'التصنيفات',role:ROLES.SUPER_ADMIN,searchField:'name',fields:{name:'text',stableId:'text',description:'textarea',icon:'text',order:'number',active:'checkbox'}},
+  resources:{label:'المصادر',role:ROLES.CONTENT_ADMIN,searchField:'title',fields:{title:'text',url:'url',description:'textarea',type:'text',subjectId:'text',categoryId:'text',branchIds:'ids',keywords:'ids',tags:'ids',author:'text',order:'number',active:'checkbox'}},
+  foundations:{label:'التأسيس',role:ROLES.CONTENT_ADMIN,searchField:'title',fields:{title:'text',url:'url',description:'textarea',type:'text',level:'text',subjectId:'text',branchIds:'ids',keywords:'ids',author:'text',order:'number',active:'checkbox'}},
+  solutions:{label:'الحلول',role:ROLES.CONTENT_ADMIN,searchField:'title',fields:{title:'text',category:'text',categoryName:'text',problem:'textarea',solution:'textarea',steps:'textarea',notes:'textarea',keywords:'ids',order:'number',status:'text',active:'checkbox'}},
+  flashcards:{label:'البطاقات',role:ROLES.CONTENT_ADMIN,searchField:'question',fields:{question:'textarea',answer:'textarea',explanation:'textarea',subjectId:'text',branchId:'text',order:'number',active:'checkbox'}},
+  templates:{label:'قوالب المصادر',role:ROLES.CONTENT_ADMIN,searchField:'name',fields:{name:'text',target:'text',description:'textarea',fields:'ids',instructions:'ids'}},
+  sourceRegistry:{label:'سجل المصادر',role:ROLES.REVIEWER,writeRole:ROLES.REVIEWER,searchField:'name',orderField:'createdAt',fields:{sourceId:'text',name:'text',title:'text',url:'url',description:'textarea',path:'text',mimeType:'text',status:'text',branchIds:'ids',subjectId:'text',categoryId:'text',keywords:'ids',tags:'ids',needsReview:'checkbox',provider:'text',createdByEmail:'email',publishedResourceId:'text'}},
+  suggestions:{label:'الاقتراحات',role:ROLES.REVIEWER,writeRole:ROLES.REVIEWER,searchField:'title',orderField:'createdAt',fields:{title:'text',url:'url',description:'textarea',contentType:'text',status:'text',createdBy:'text',studentName:'text',branchId:'text',subjectId:'text',level:'text',foundationType:'text',type:'text',keywords:'ids',reviewedBy:'text',reviewerNote:'textarea'}},
+  problemReports:{label:'البلاغات',role:ROLES.REVIEWER,writeRole:ROLES.REVIEWER,searchField:'sourceTitle',orderField:'createdAt',fields:{sourceId:'text',sourceTitle:'text',sourceUrl:'url',kind:'text',description:'textarea',status:'text',createdBy:'text',adminNote:'textarea'}},
+  admins:{label:'المشرفون',role:ROLES.SUPER_ADMIN,searchField:'email',orderField:'createdAt',fields:{email:'email',role:'text',active:'checkbox'}},
+  adminLogs:{label:'سجل الإدارة',role:ROLES.SUPER_ADMIN,readOnly:true,searchField:'collection',orderField:'createdAt',fields:{action:'text',collection:'text',targetId:'text',details:'textarea',adminUid:'text',adminEmail:'email',role:'text'}}
 };
 
 const errorMap={RESOURCE_TITLE_REQUIRED:'يرجى إدخال عنوان المصدر.',RESOURCE_URL_REQUIRED:'يرجى إدخال رابط المصدر.',RESOURCE_URL_INVALID:'رابط المصدر غير صالح.',RESOURCE_URL_PROTOCOL:'رابط المصدر يجب أن يبدأ بـ http أو https.',RESOURCE_BRANCH_REQUIRED:'يرجى اختيار فرع واحد على الأقل.',RESOURCE_SUBJECT_REQUIRED:'يرجى اختيار المادة.',RESOURCE_URL_DUPLICATE:'هذا الرابط موجود مسبقًا.',RESOURCE_NOT_FOUND:'المصدر غير موجود.'};
@@ -23,9 +23,10 @@ export function friendlyError(e){const key=e?.message||e?.code||'';return errorM
 
 let state={collection:'branches',cursor:null,admin:null};
 export function setAdmin(a){state.admin=a} export function getAdmin(){return state.admin}
-export function allowed(c){return !!state.admin&&hasRole(state.admin.role,configs[c]?.role||'reviewer')}
+export function allowed(c){return !!state.admin&&hasRole(state.admin.role,configs[c]?.role||ROLES.REVIEWER)}
 export function canWrite(c){const cfg=configs[c];return allowed(c)&&!cfg.readOnly&&hasRole(state.admin.role,cfg.writeRole||cfg.role)}
-export async function loadPage(c,filters={}){const cfg=configs[c];return getPage(c,{...filters,searchField:cfg.searchField,orderField:cfg.orderField},20,state.cursor)}
+export async function loadPage(c,filters={}){const cfg=adminApiConfig(c);return getPage(c,{...filters,searchField:cfg.searchField,orderField:cfg.orderField},20,state.cursor)}
+function adminApiConfig(c){return configs[c]||{label:c,role:ROLES.REVIEWER,searchField:'name'};}
 export async function persist(c,id,payload){if(!canWrite(c))throw Error('ليس لديك صلاحية للكتابة');const saved=await save(c,id,payload);await logAction(state.admin,id?'update':'create',c,saved,payload.title||payload.name||payload.question||payload.email||payload.sourceId||'');return saved}
 export async function erase(c,id){if(!canWrite(c))throw Error('ليس لديك صلاحية للحذف');await remove(c,id);await logAction(state.admin,'delete',c,id,'')}
 export async function stats(){const names=['branches','subjects','categories','resources','foundations','suggestions','problemReports'];const out={};await Promise.all(names.map(async n=>{const f=n==='suggestions'?{status:'pending'}:n==='problemReports'?{status:'open'}:{active:true};try{out[n]=await count(n,f)}catch(e){console.warn('[admin.stats]',n,e);out[n]=0}}));return out}
@@ -43,7 +44,7 @@ export function toPayload(c,form){
   if(c==='suggestions'){if(!p.title||p.title.length<3)throw Error('عنوان الاقتراح مطلوب');if((p.description||'').length>5000)throw Error('الاقتراح طويل جدًا')}
   if(c==='problemReports'){if(!p.description||p.description.length<5)throw Error('وصف البلاغ مطلوب');if(p.description.length>2000)throw Error('البلاغ طويل جدًا')}
   if(c==='templates'){if(!p.name||p.name.length<2)throw Error('اسم القالب مطلوب');if(!p.target)throw Error('يجب تحديد هدف القالب');if(p.fields.length>100)throw Error('عدد حقول القالب كبير جدًا');if(p.instructions.length>100)throw Error('عدد تعليمات القالب كبير جدًا')}
-  if(c==='sourceRegistry'){if(!p.sourceId){p.sourceId='source-'+Date.now()}if(!p.name&& !p.title)throw Error('اسم المصدر مطلوب');if(p.path&&p.path.length>2000)throw Error('مسار المصدر طويل جدًا');if(p.status&&!['pending_review','published','rejected','approved','pending','indexed','ready','error','archived'].includes(p.status))throw Error('حالة المصدر غير صالحة')}
+  if(c==='sourceRegistry'){if(!p.sourceId){p.sourceId='source-'+Date.now()}if(!p.name&&!p.title)throw Error('اسم المصدر مطلوب');if(p.path&&p.path.length>2000)throw Error('مسار المصدر طويل جدًا');if(p.status&&!['pending_review','published','rejected','approved','pending','indexed','ready','error','archived'].includes(p.status))throw Error('حالة المصدر غير صالحة')}
   return p
 }
 export function initialValue(type,v){if(type==='checkbox')return!!v;if(type==='ids')return Array.isArray(v)?v.join(', '):String(v||'');return String(v??'')}
