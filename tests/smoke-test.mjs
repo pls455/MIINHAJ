@@ -4,7 +4,8 @@ import path from 'node:path';
 const root = process.cwd();
 const required = [
   'index.html','firebase.json','firestore.rules','firestore.indexes.json','README.md',
-  'css/variables.css','js/services/firebase.js',
+  'css/variables.css','js/services/firebase.js','js/services/firebase/auth.js',
+  'js/services/firebase/adminCore.js','js/services/firebase/permissions.js',
   'js/repositories/resourceRepository.js','js/repositories/solutionRepository.js',
   'js/repositories/foundationRepository.js','js/services/ai/aiService.js',
   'worker/src/index.js','worker/wrangler.toml',
@@ -63,9 +64,24 @@ try {
   for (const role of ['reviewer','content_admin','super_admin']) {
     if (!rules.includes(`'${role}'`)) failures.push(`Firestore role missing from rules: ${role}`);
   }
+  if (!rules.includes('canonicalRole()')) failures.push('Firestore admin writes are missing canonical role validation');
 } catch (error) {
   failures.push(`firestore.rules unreadable: ${error.message}`);
 }
+
+try {
+  const constants = fs.readFileSync(path.join(root, 'js/core/constants.js'), 'utf8');
+  const adminData = fs.readFileSync(path.join(root, 'js/admin/data.js'), 'utf8');
+  if (!/ROLES\s*=/.test(constants) || !/REVIEWER/.test(constants) || !/CONTENT_ADMIN/.test(constants) || !/SUPER_ADMIN/.test(constants)) failures.push('Canonical role constants are incomplete');
+  if (!/ROLES\.SUPER_ADMIN/.test(adminData) || !/ROLES\.CONTENT_ADMIN/.test(adminData)) failures.push('Admin data config is not using canonical role constants');
+} catch (error) {
+  failures.push(`Role configuration unreadable: ${error.message}`);
+}
+
+const adminIndex = fs.readFileSync(path.join(root, 'admin/index.html'), 'utf8');
+if (!/src=["']\.\.\/js\/admin\/index\.js["']/.test(adminIndex)) failures.push('Admin entrypoint does not use js/admin/index.js');
+if (fs.existsSync(path.join(root,'admin/index.js'))) failures.push('Orphan admin/index.js must not exist');
+if (fs.existsSync(path.join(root,'cloudflare-worker'))) failures.push('Duplicate cloudflare-worker directory must not exist');
 
 if (missing.length || failures.length) {
   console.error('Smoke test failed');
