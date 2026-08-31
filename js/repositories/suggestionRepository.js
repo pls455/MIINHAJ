@@ -2,44 +2,9 @@ import { collection, doc, getDocs, addDoc, updateDoc, query, orderBy, limit, sta
 import { db } from '../services/firebase.js';
 import { writeAdminLog } from '../services/firebase/adminLogRepository.js';
 
-const NAME = 'suggestions';
-const clean = value => String(value ?? '').trim();
-
-function validate(input) {
-  const data = {
-    title: clean(input.title).slice(0, 200),
-    contentType: input.contentType === 'foundation' ? 'foundation' : 'resource',
-    studentName: clean(input.studentName).slice(0, 80),
-    url: clean(input.url), branchId: clean(input.branchId), subjectId: clean(input.subjectId),
-    level: clean(input.level), foundationType: clean(input.foundationType), type: clean(input.type),
-    description: clean(input.description).slice(0, 3000),
-    keywords: Array.isArray(input.keywords) ? [...new Set(input.keywords.map(clean).filter(Boolean))].slice(0, 30) : []
-  };
-  if (!data.title) throw new Error('SUGGESTION_TITLE_REQUIRED');
-  if (!/^https?:\/\//i.test(data.url)) throw new Error('SUGGESTION_URL_INVALID');
-  if (!data.branchId || !data.subjectId) throw new Error('SUGGESTION_ACADEMIC_CONTEXT_REQUIRED');
-  return data;
-}
-
-export async function createSuggestion(input) {
-  const data = validate(input);
-  const ref = await addDoc(collection(db, NAME), { ...data, status: 'pending', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-  await writeAdminLog({ action: 'create', collectionName: NAME, targetId: ref.id, details: { title: data.title } });
-  return ref.id;
-}
-
-export async function getSuggestions({ pageSize = 24, cursor = null, status = null } = {}) {
-  const clauses = [];
-  if (status) clauses.push(where('status', '==', status));
-  clauses.push(orderBy('createdAt', 'desc'));
-  if (cursor) clauses.push(startAfter(cursor));
-  clauses.push(limit(Math.min(Math.max(Number(pageSize) || 24, 1), 50)));
-  const snap = await getDocs(query(collection(db, NAME), ...clauses));
-  return { items: snap.docs.map(d => ({ id: d.id, ...d.data() })), nextCursor: snap.docs.at(-1) || null };
-}
-
-export async function updateSuggestionStatus(id, status, note = '') {
-  if (!['pending','approved','rejected','archived'].includes(status)) throw new Error('SUGGESTION_STATUS_INVALID');
-  await updateDoc(doc(db, NAME, id), { status, reviewerNote: clean(note).slice(0, 1000), reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() });
-  await writeAdminLog({ action: 'update', collectionName: NAME, targetId: id, details: { status } });
-}
+const NAME='suggestions',MAX_ID=128,MAX_TITLE=200,MAX_DESC=3000;
+const clean=v=>String(v??'').trim(), validId=id=>typeof id==='string'&&id.length>0&&id.length<=MAX_ID;
+function validate(input={}){const data={title:clean(input.title).slice(0,MAX_TITLE),contentType:input.contentType==='foundation'?'foundation':'resource',studentName:clean(input.studentName).slice(0,80),url:clean(input.url),branchId:clean(input.branchId),subjectId:clean(input.subjectId),level:clean(input.level),foundationType:clean(input.foundationType),type:clean(input.type),description:clean(input.description).slice(0,MAX_DESC),keywords:Array.isArray(input.keywords)?[...new Set(input.keywords.map(clean).filter(Boolean))].slice(0,30):[]};if(!data.title)throw Error('SUGGESTION_TITLE_REQUIRED');if(data.title.length>MAX_TITLE)throw Error('SUGGESTION_TITLE_TOO_LONG');let u;try{u=new URL(data.url)}catch{throw Error('SUGGESTION_URL_INVALID')}if(!['http:','https:'].includes(u.protocol))throw Error('SUGGESTION_URL_PROTOCOL');if(!data.branchId||!data.subjectId)throw Error('SUGGESTION_ACADEMIC_CONTEXT_REQUIRED');return data;}
+export async function createSuggestion(input){const data=validate(input);const ref=await addDoc(collection(db,NAME),{...data,status:'pending',createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await writeAdminLog({action:'create',collectionName:NAME,targetId:ref.id,details:{title:data.title}});return ref.id;}
+export async function getSuggestions({pageSize=24,cursor=null,status=null}={}){const clauses=[];if(status)clauses.push(where('status','==',status));clauses.push(orderBy('createdAt','desc'));if(cursor)clauses.push(startAfter(cursor));clauses.push(limit(Math.min(Math.max(Number(pageSize)||24,1),50)));const snap=await getDocs(query(collection(db,NAME),...clauses));return{items:snap.docs.map(d=>({id:d.id,...d.data()})),nextCursor:snap.docs.at(-1)||null};}
+export async function updateSuggestionStatus(id,status,note=''){if(!validId(id))throw Error('DOCUMENT_ID_INVALID');if(!['pending','approved','rejected','archived'].includes(status))throw Error('SUGGESTION_STATUS_INVALID');await updateDoc(doc(db,NAME,id),{status,reviewerNote:clean(note).slice(0,1000),reviewedAt:serverTimestamp(),updatedAt:serverTimestamp()});await writeAdminLog({action:'update',collectionName:NAME,targetId:id,details:{status}});}
