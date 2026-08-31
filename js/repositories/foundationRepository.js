@@ -2,37 +2,13 @@ import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, 
 import { db } from '../services/firebase.js';
 import { writeAdminLog } from '../services/firebase/adminLogRepository.js';
 
-const NAME = 'foundations';
-const MAX_LIMIT = 50;
-
-function normalizeLimit(value) { return Math.min(Math.max(Number(value) || 24, 1), MAX_LIMIT); }
-function ref() { return collection(db, NAME); }
-
-export async function getFoundations({ limit: pageSize = 24, cursor = null } = {}) {
-  const constraints = [orderBy('order', 'asc')];
-  if (cursor) constraints.push(startAfter(cursor));
-  constraints.push(limit(normalizeLimit(pageSize)));
-  const snap = await getDocs(query(ref(), ...constraints));
-  return { items: snap.docs.map(d => ({ id: d.id, ...d.data() })), nextCursor: snap.docs.at(-1) || null };
-}
-
-export async function getFoundation(id) {
-  const snap = await getDoc(doc(db, NAME, id));
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
-}
-
-export async function createFoundation(data) {
-  const refDoc = await addDoc(ref(), { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-  await writeAdminLog({ action: 'create', collectionName: NAME, targetId: refDoc.id, details: { title: String(data?.title ?? '').slice(0, 200) } });
-  return refDoc;
-}
-
-export async function updateFoundation(id, data) {
-  await updateDoc(doc(db, NAME, id), { ...data, updatedAt: serverTimestamp() });
-  await writeAdminLog({ action: 'update', collectionName: NAME, targetId: id, details: { title: String(data?.title ?? '').slice(0, 200) } });
-}
-
-export async function deleteFoundation(id) {
-  await deleteDoc(doc(db, NAME, id));
-  await writeAdminLog({ action: 'delete', collectionName: NAME, targetId: id, details: {} });
-}
+const NAME='foundations',MAX_LIMIT=50,MAX_ID=128,MAX_TITLE=300,MAX_DESC=5000;
+const normalizeLimit=v=>Math.min(Math.max(Number(v)||24,1),MAX_LIMIT);
+const validId=id=>typeof id==='string'&&id.length>0&&id.length<=MAX_ID;
+function normalizeFoundation(data={}){const d={...data,title:String(data.title??'').trim(),description:String(data.description??'').trim(),type:String(data.type??'').trim(),url:String(data.url??'').trim(),order:Number(data.order)};if(!d.title)throw Error('FOUNDATION_TITLE_REQUIRED');if(d.title.length>MAX_TITLE)throw Error('FOUNDATION_TITLE_TOO_LONG');if(d.description.length>MAX_DESC)throw Error('FOUNDATION_DESCRIPTION_TOO_LONG');if(d.url){let u;try{u=new URL(d.url)}catch{throw Error('FOUNDATION_URL_INVALID')}if(!['http:','https:'].includes(u.protocol))throw Error('FOUNDATION_URL_PROTOCOL')}d.order=Number.isFinite(d.order)&&d.order>=0?d.order:0;d.active=d.active!==false;return d;}
+function collectionRef(){return collection(db,NAME)}
+export async function getFoundations({limit:pageSize=24,cursor=null}={}){const c=[orderBy('order','asc')];if(cursor)c.push(startAfter(cursor));c.push(limit(normalizeLimit(pageSize)));const snap=await getDocs(query(collectionRef(),...c));return{items:snap.docs.map(d=>({id:d.id,...d.data()})),nextCursor:snap.docs.at(-1)||null};}
+export async function getFoundation(id){if(!validId(id))throw Error('DOCUMENT_ID_INVALID');const snap=await getDoc(doc(db,NAME,id));return snap.exists()?{id:snap.id,...snap.data()}:null;}
+export async function createFoundation(data){const normalized=normalizeFoundation(data);const refDoc=await addDoc(collectionRef(),{...normalized,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await writeAdminLog({action:'create',collectionName:NAME,targetId:refDoc.id,details:{title:normalized.title}});return refDoc;}
+export async function updateFoundation(id,data){if(!validId(id))throw Error('DOCUMENT_ID_INVALID');const normalized=normalizeFoundation(data);await updateDoc(doc(db,NAME,id),{...normalized,updatedAt:serverTimestamp()});await writeAdminLog({action:'update',collectionName:NAME,targetId:id,details:{title:normalized.title}});}
+export async function deleteFoundation(id){if(!validId(id))throw Error('DOCUMENT_ID_INVALID');await deleteDoc(doc(db,NAME,id));await writeAdminLog({action:'delete',collectionName:NAME,targetId:id,details:{}});}
