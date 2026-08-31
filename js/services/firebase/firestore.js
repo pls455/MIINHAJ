@@ -13,7 +13,7 @@ import {
   updateDoc,
   where,
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
-import { db } from "./firebase.js";
+import { db } from "../firebase.js";
 
 export function collectionRef(name) {
   return collection(db, name);
