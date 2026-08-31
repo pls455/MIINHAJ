@@ -2,47 +2,12 @@ import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, 
 import { db } from '../services/firebase.js';
 import { writeAdminLog } from '../services/firebase/adminLogRepository.js';
 
-const NAME = 'solutions';
-const MAX_LIMIT = 50;
-
-function normalizeLimit(value) { return Math.min(Math.max(Number(value) || 24, 1), MAX_LIMIT); }
-function collectionRef() { return collection(db, NAME); }
-function normalizeSolution(data = {}) {
-  const title = String(data.title ?? '').trim();
-  if (!title) throw new Error('SOLUTION_TITLE_REQUIRED');
-  return { ...data, title: title.slice(0, 300), ...(data.active !== undefined ? { active: Boolean(data.active) } : {}) };
-}
-
-export async function getSolutions({ pageSize = 24, cursor = null, subjectId = null, activeOnly = false } = {}) {
-  const constraints = [];
-  if (subjectId) constraints.push(where('subjectId', '==', subjectId));
-  if (activeOnly) constraints.push(where('active', '==', true));
-  constraints.push(orderBy('order', 'asc'));
-  if (cursor) constraints.push(startAfter(cursor));
-  constraints.push(limit(normalizeLimit(pageSize)));
-  const snap = await getDocs(query(collectionRef(), ...constraints));
-  return { items: snap.docs.map(d => ({ id: d.id, ...d.data() })), nextCursor: snap.docs.at(-1) || null };
-}
-
-export async function getSolution(id) {
-  const snap = await getDoc(doc(db, NAME, id));
-  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
-}
-
-export async function createSolution(data) {
-  const normalized = normalizeSolution(data);
-  const refDoc = await addDoc(collectionRef(), { ...normalized, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-  await writeAdminLog({ action: 'create', collectionName: NAME, targetId: refDoc.id, details: { title: normalized.title } });
-  return refDoc;
-}
-
-export async function updateSolution(id, data) {
-  const normalized = normalizeSolution(data);
-  await updateDoc(doc(db, NAME, id), { ...normalized, updatedAt: serverTimestamp() });
-  await writeAdminLog({ action: 'update', collectionName: NAME, targetId: id, details: { title: normalized.title } });
-}
-
-export async function deleteSolution(id) {
-  await deleteDoc(doc(db, NAME, id));
-  await writeAdminLog({ action: 'delete', collectionName: NAME, targetId: id, details: {} });
-}
+const NAME='solutions',MAX_LIMIT=50,MAX_ID=128,MAX_TITLE=300,MAX_DESC=5000;
+const normalizeLimit=v=>Math.min(Math.max(Number(v)||24,1),MAX_LIMIT),validId=id=>typeof id==='string'&&id.length>0&&id.length<=MAX_ID;
+function normalizeSolution(data={}){const d={...data,title:String(data.title??'').trim(),description:String(data.description??'').trim(),url:String(data.url??'').trim(),category:String(data.category??'').trim(),order:Number(data.order)};if(!d.title)throw Error('SOLUTION_TITLE_REQUIRED');if(d.title.length>MAX_TITLE)throw Error('SOLUTION_TITLE_TOO_LONG');if(d.description.length>MAX_DESC)throw Error('SOLUTION_DESCRIPTION_TOO_LONG');if(d.url){let u;try{u=new URL(d.url)}catch{throw Error('SOLUTION_URL_INVALID')}if(!['http:','https:'].includes(u.protocol))throw Error('SOLUTION_URL_PROTOCOL')}d.order=Number.isFinite(d.order)&&d.order>=0?d.order:0;d.active=d.active!==false;return d;}
+function collectionRef(){return collection(db,NAME)}
+export async function getSolutions({pageSize=24,cursor=null,subjectId=null,activeOnly=false}={}){const c=[];if(subjectId)c.push(where('subjectId','==',subjectId));if(activeOnly)c.push(where('active','==',true));c.push(orderBy('order','asc'));if(cursor)c.push(startAfter(cursor));c.push(limit(normalizeLimit(pageSize)));const snap=await getDocs(query(collectionRef(),...c));return{items:snap.docs.map(d=>({id:d.id,...d.data()})),nextCursor:snap.docs.at(-1)||null};}
+export async function getSolution(id){if(!validId(id))throw Error('DOCUMENT_ID_INVALID');const snap=await getDoc(doc(db,NAME,id));return snap.exists()?{id:snap.id,...snap.data()}:null;}
+export async function createSolution(data){const normalized=normalizeSolution(data);const refDoc=await addDoc(collectionRef(),{...normalized,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await writeAdminLog({action:'create',collectionName:NAME,targetId:refDoc.id,details:{title:normalized.title}});return refDoc;}
+export async function updateSolution(id,data){if(!validId(id))throw Error('DOCUMENT_ID_INVALID');const normalized=normalizeSolution(data);await updateDoc(doc(db,NAME,id),{...normalized,updatedAt:serverTimestamp()});await writeAdminLog({action:'update',collectionName:NAME,targetId:id,details:{title:normalized.title}});}
+export async function deleteSolution(id){if(!validId(id))throw Error('DOCUMENT_ID_INVALID');await deleteDoc(doc(db,NAME,id));await writeAdminLog({action:'delete',collectionName:NAME,targetId:id,details:{}});}
