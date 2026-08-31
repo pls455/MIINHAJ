@@ -59,7 +59,7 @@ service cloud.firestore {
       allow read: if superAdmin();
       allow create: if activeAdmin()
         && request.resource.data.adminUid == request.auth.uid
-        && request.resource.data.role == role();
+        && request.resource.data.role in ['reviewer','content_admin','super_admin','superadmin','admin'];
       allow update, delete: if false;
     }
     match /{document=**} { allow read, write: if false; }
