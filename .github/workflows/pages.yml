@@ -15,7 +15,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate project
+        run: node tests/smoke-test.mjs
+
+      - name: Validate AI Worker
+        working-directory: worker
+        run: |
+          test -f src/index.js
+          test -f wrangler.toml
+          node --check src/index.js
+
   deploy:
+    needs: validate
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -26,14 +48,6 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
-
-      - name: Validate static entrypoint
-        run: |
-          test -f index.html
-          test -f firebase.json
-          test -f firestore.rules
-          test -d js
-          test -d css
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
