@@ -1,6 +1,9 @@
-const AI_URL = window.MINHAJ_AI_URL || 'https://minhaj-ai.example.workers.dev';
+const AI_URL = String(window.MINHAJ_AI_URL || '').trim().replace(/\/$/, '');
+
+if (!AI_URL) console.warn('[ai] MINHAJ_AI_URL is not configured. AI features are disabled.');
 
 async function request(action, payload = {}) {
+  if (!AI_URL) throw new Error('AI_NOT_CONFIGURED');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 18000);
   try {
@@ -16,6 +19,7 @@ async function request(action, payload = {}) {
   } catch (error) {
     console.error('[ai]', error);
     if (error.name === 'AbortError') throw new Error('انتهت مهلة الاتصال بمساعد منهاج.');
+    if (error.message === 'AI_NOT_CONFIGURED') throw new Error('مساعد منهاج غير مهيأ حاليًا.');
     throw error;
   } finally { clearTimeout(timer); }
 }
