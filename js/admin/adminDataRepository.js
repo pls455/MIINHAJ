@@ -5,6 +5,7 @@ import { writeAdminLog } from '../services/firebase/adminLogRepository.js';
 const MAX_LIST = 100;
 const MAX_NAME = 200;
 const MAX_DESCRIPTION = 2000;
+const MAX_BRANCH_IDS = 100;
 const STABLE_ID_RE = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 
 const configs = Object.freeze({
@@ -23,10 +24,10 @@ function clean(input, collectionName) {
   const config = getConfig(collectionName);
   const data = {};
   for (const field of config.fields) {
-    const value = input[field];
+    const value = input?.[field];
     if (field === 'order') data[field] = Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : 0;
     else if (field === 'active') data[field] = value !== false;
-    else if (field === 'branchIds') data[field] = Array.isArray(value) ? [...new Set(value.map(v => String(v).trim()).filter(Boolean))].slice(0, 100) : [];
+    else if (field === 'branchIds') data[field] = Array.isArray(value) ? [...new Set(value.map(v => String(v).trim()).filter(Boolean))].slice(0, MAX_BRANCH_IDS) : [];
     else data[field] = String(value ?? '').trim();
   }
   if (!data.name) throw new Error('ADMIN_NAME_REQUIRED');
@@ -70,6 +71,7 @@ export async function saveAdminItem(collectionName, id, input) {
 
 export async function removeAdminItem(collectionName, id) {
   getConfig(collectionName);
+  if (!id || typeof id !== 'string') throw new Error('ADMIN_TARGET_ID_INVALID');
   await deleteDoc(doc(db, collectionName, id));
   await writeAdminLog({ action: 'delete', collectionName, targetId: id });
 }
