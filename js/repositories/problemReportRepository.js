@@ -6,10 +6,7 @@ const NAME = 'problemReports';
 const clean = value => String(value ?? '').trim();
 
 function validate(input) {
-  const data = {
-    sourceId: clean(input.sourceId), sourceTitle: clean(input.sourceTitle).slice(0, 200),
-    kind: clean(input.kind).slice(0, 100), description: clean(input.description).slice(0, 2000)
-  };
+  const data = { sourceId: clean(input.sourceId), sourceTitle: clean(input.sourceTitle).slice(0, 200), kind: clean(input.kind).slice(0, 100), description: clean(input.description).slice(0, 2000) };
   if (!data.description) throw new Error('REPORT_DESCRIPTION_REQUIRED');
   if (!data.kind) throw new Error('REPORT_KIND_REQUIRED');
   return data;
@@ -17,7 +14,8 @@ function validate(input) {
 
 export async function createProblemReport(input) {
   const data = validate(input);
-  const ref = await addDoc(collection(db, NAME), { ...data, status: 'open', createdAt: serverTimestamp() });
+  const ref = await addDoc(collection(db, NAME), { ...data, status: 'open', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  await writeAdminLog({ action: 'create', collectionName: NAME, targetId: ref.id, details: { kind: data.kind, sourceId: data.sourceId } });
   return ref.id;
 }
 
