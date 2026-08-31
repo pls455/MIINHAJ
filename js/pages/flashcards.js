@@ -8,6 +8,7 @@ const status = document.getElementById('status');
 const more = document.getElementById('more');
 let rows = [], index = 0, cursor = null, loading = false;
 let repositoriesPromise;
+const seenIds = new Set();
 function getRepositories() { return repositoriesPromise ??= import('../repositories/resourceRepository.js').then(m => m.repositories); }
 
 function render() {
@@ -23,7 +24,13 @@ async function loadMore() {
   try {
     const repositories = await getRepositories();
     const result = await repositories.flashcards.page({}, 30, cursor);
-    rows.push(...result.rows); cursor = result.nextCursor; more.hidden = !result.hasMore; status.textContent = ''; render();
+    const fresh = result.rows.filter(item => !seenIds.has(item.id));
+    fresh.forEach(item => seenIds.add(item.id));
+    rows.push(...fresh);
+    cursor = result.nextCursor;
+    more.hidden = !result.hasMore || (fresh.length === 0 && !result.nextCursor);
+    status.textContent = '';
+    render();
   } catch (error) { console.error('[flashcards.load]', error); status.textContent = 'تعذر تحميل البطاقات.'; }
   finally { loading = false; more.disabled = false; }
 }
