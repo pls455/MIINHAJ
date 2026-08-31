@@ -3,53 +3,70 @@ import path from 'node:path';
 
 const root = process.cwd();
 const required = [
-  'index.html','firebase.json','firestore.rules','README.md',
+  'index.html','firebase.json','firestore.rules','firestore.indexes.json','README.md',
   'css/variables.css','js/services/firebase.js',
-  'js/repositories/resourceRepository.js','js/services/ai/aiService.js',
+  'js/repositories/resourceRepository.js','js/repositories/solutionRepository.js',
+  'js/repositories/foundationRepository.js','js/services/ai/aiService.js',
+  'worker/src/index.js','worker/wrangler.toml',
   'admin/index.html','admin/problem-reports.html','admin/suggestions.html'
 ];
-const htmlFiles = [];
-const failures = [];
-function walk(dir) {
-  for (const entry of fs.readdirSync(dir,{withFileTypes:true})) {
+const htmlFiles = [], jsFiles = [], failures = [];
+function walk(dir, matcher, output) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (['.git','node_modules'].includes(entry.name)) continue;
-    const full = path.join(dir,entry.name);
-    if (entry.isDirectory()) walk(full);
-    else if (entry.name.endsWith('.html')) htmlFiles.push(full);
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full, matcher, output);
+    else if (matcher(entry.name)) output.push(full);
   }
 }
 function cleanTarget(value) { return value.split('#')[0].split('?')[0]; }
 function checkTarget(file, raw, kind) {
   const target = cleanTarget(raw);
   if (!target || target.startsWith('#') || /^(https?:|mailto:|tel:|javascript:|data:)/i.test(target)) return;
-  const resolved = target.startsWith('/') ? path.join(root,target.slice(1)) : path.resolve(path.dirname(file),target);
-  if (!fs.existsSync(resolved)) failures.push(`${kind} missing: ${path.relative(root,file)} -> ${raw}`);
+  const resolved = target.startsWith('/') ? path.join(root, target.slice(1)) : path.resolve(path.dirname(file), target);
+  if (!fs.existsSync(resolved)) failures.push(`${kind} missing: ${path.relative(root, file)} -> ${raw}`);
 }
-walk(root);
-const missing = required.filter(p => !fs.existsSync(path.join(root,p)));
+
+walk(root, name => name.endsWith('.html'), htmlFiles);
+walk(root, name => /\.m?js$/.test(name), jsFiles);
+const missing = required.filter(p => !fs.existsSync(path.join(root, p)));
+
 for (const file of htmlFiles) {
-  const source = fs.readFileSync(file,'utf8');
-  if (/<script[^>]+(?:src|type)=[^>]*(?:\.ts|tsx|react|vue)/i.test(source)) failures.push(`Forbidden frontend reference: ${path.relative(root,file)}`);
-  for (const match of source.matchAll(/(?:href|src)=["']([^"']+)["']/gi)) checkTarget(file,match[1],'HTML target');
+  const source = fs.readFileSync(file, 'utf8');
+  if (/<script[^>]+(?:src|type)=[^>]*(?:\.ts|tsx|react|vue)/i.test(source)) failures.push(`Forbidden frontend reference: ${path.relative(root, file)}`);
+  for (const match of source.matchAll(/(?:href|src)=["']([^"']+)["']/gi)) checkTarget(file, match[1], 'HTML target');
 }
-const jsFiles = [];
-function walkJs(dir) {
-  for (const entry of fs.readdirSync(dir,{withFileTypes:true})) {
-    if (['.git','node_modules'].includes(entry.name)) continue;
-    const full=path.join(dir,entry.name);
-    if(entry.isDirectory()) walkJs(full); else if(/\.m?js$/.test(entry.name)) jsFiles.push(full);
-  }
-}
-walkJs(root);
 for (const file of jsFiles) {
-  const source=fs.readFileSync(file,'utf8');
+  const source = fs.readFileSync(file, 'utf8');
   for (const match of source.matchAll(/(?:from\s*["']|import\s*\(["'])(\.\.?\/[^"']+)["']/g)) {
-    let target=match[1];
-    if(!path.extname(target)) target += '.js';
-    const resolved=path.resolve(path.dirname(file),target);
-    if(!fs.existsSync(resolved)) failures.push(`JS import missing: ${path.relative(root,file)} -> ${match[1]}`);
+    let target = match[1];
+    if (!path.extname(target)) target += '.js';
+    if (!fs.existsSync(path.resolve(path.dirname(file), target))) failures.push(`JS import missing: ${path.relative(root, file)} -> ${match[1]}`);
   }
+  if (/firebasejs\/11\./.test(source)) failures.push(`Legacy Firebase SDK v11 reference: ${path.relative(root, file)}`);
+  if (/services\/firebase\/firebaseConfig\.js/.test(source)) failures.push(`Legacy Firebase config import: ${path.relative(root, file)}`);
 }
+
+try {
+  const indexes = JSON.parse(fs.readFileSync(path.join(root, 'firestore.indexes.json'), 'utf8'));
+  if (!Array.isArray(indexes.indexes)) failures.push('firestore.indexes.json: indexes must be an array');
+  const collections = new Set((indexes.indexes || []).map(index => index.collectionGroup));
+  for (const collection of ['resources','flashcards','solutions','suggestions','problemReports']) {
+    if (!collections.has(collection)) failures.push(`Missing Firestore index coverage: ${collection}`);
+  }
+} catch (error) {
+  failures.push(`firestore.indexes.json invalid: ${error.message}`);
+}
+
+try {
+  const rules = fs.readFileSync(path.join(root, 'firestore.rules'), 'utf8');
+  for (const role of ['reviewer','content_admin','super_admin']) {
+    if (!rules.includes(`'${role}'`)) failures.push(`Firestore role missing from rules: ${role}`);
+  }
+} catch (error) {
+  failures.push(`firestore.rules unreadable: ${error.message}`);
+}
+
 if (missing.length || failures.length) {
   console.error('Smoke test failed');
   if (missing.length) console.error('Missing required files:', missing);
