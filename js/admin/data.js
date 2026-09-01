@@ -29,7 +29,7 @@ export async function loadPage(c,filters={}){const cfg=adminApiConfig(c);return 
 function adminApiConfig(c){return configs[c]||{label:c,role:ROLES.REVIEWER,searchField:'name'};}
 export async function persist(c,id,payload){if(!canWrite(c))throw Error('ليس لديك صلاحية للكتابة');const saved=await save(c,id,payload);await logAction(state.admin,id?'update':'create',c,saved,payload.title||payload.name||payload.question||payload.email||payload.sourceId||'');return saved}
 export async function erase(c,id){if(!canWrite(c))throw Error('ليس لديك صلاحية للحذف');await remove(c,id);await logAction(state.admin,'delete',c,id,'')}
-export async function stats(){const names=['branches','subjects','categories','resources','foundations','suggestions','problemReports'];const out={};await Promise.all(names.map(async n=>{const f=n==='suggestions'?{status:'pending'}:n==='problemReports'?{status:'open'}:{active:true};try{out[n]=await count(n,f)}catch(e){console.warn('[admin.stats]',n,e);out[n]=0}}));return out}
+export async function stats(){const names=['branches','subjects','categories','resources','foundations','suggestions','problemReports'];const out={};await Promise.all(names.map(async n=>{const f=n==='suggestions'?{status:'pending'}:n==='problemReports'?{status:'open'}:{};try{out[n]=await count(n,f)}catch(e){console.warn('[admin.stats]',n,e);out[n]=0}}));return out}
 
 export function toPayload(c,form){
   const p={};
