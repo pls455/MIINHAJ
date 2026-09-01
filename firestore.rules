@@ -18,6 +18,19 @@ service cloud.firestore {
         && request.resource.data.role == 'student'
         && (request.resource.data.identityNumber == null || (request.resource.data.identityNumber is string && request.resource.data.identityNumber.size() >= 4 && request.resource.data.identityNumber.size() <= 32));
     }
+    function validSet() {
+      return request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+        && request.resource.data.description is string && request.resource.data.description.size() <= 500
+        && request.resource.data.cardCount is int && request.resource.data.cardCount >= 0 && request.resource.data.cardCount <= 150;
+    }
+    function validStudentCard() {
+      return request.resource.data.question is string && request.resource.data.question.size() > 0 && request.resource.data.question.size() <= 4000
+        && request.resource.data.answer is string && request.resource.data.answer.size() > 0 && request.resource.data.answer.size() <= 8000
+        && request.resource.data.difficulty is string
+        && request.resource.data.tags is list && request.resource.data.tags.size() <= 10;
+    }
+    function setOwner(uid) { return signedIn() && get(/databases/$(database)/documents/studentFlashcardSets/$(uid)).data.ownerId == request.auth.uid; }
     match /admins/{uid} { allow get: if signedIn() && (request.auth.uid == uid || superAdmin()); allow list: if superAdmin(); allow create, update: if superAdmin() && validAdminWrite(); allow delete: if false; }
     match /users/{uid} {
       allow get: if signedIn() && (request.auth.uid == uid || superAdmin());
@@ -33,6 +46,18 @@ service cloud.firestore {
     match /foundations/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /solutions/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /flashcards/{id} { allow read: if contentAdmin() || resource.data.active == true; allow write: if contentAdmin() && validId(id); }
+    match /studentFlashcardSets/{setId} {
+      allow read, update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if signedIn() && validSet();
+      match /cards/{cardId} {
+        allow read, update, delete: if signedIn() && get(/databases/$(database)/documents/studentFlashcardSets/$(setId)).data.ownerId == request.auth.uid;
+        allow create: if signedIn() && get(/databases/$(database)/documents/studentFlashcardSets/$(setId)).data.ownerId == request.auth.uid && validStudentCard();
+      }
+    }
+    match /studentFlashcardShares/{setId} {
+      allow read: if true;
+      allow create, update, delete: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+    }
     match /curriculumUnits/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /templates/{id} { allow read: if contentAdmin(); allow create, update, delete: if contentAdmin(); }
     match /sourceRegistry/{id} { allow read: if reviewer(); allow create, update, delete: if reviewer(); }
