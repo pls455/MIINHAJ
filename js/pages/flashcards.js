@@ -1,41 +1,13 @@
 import { mountShell } from '../components/layout.js';
 import { escapeHtml } from '../core/utils.js';
 
-mountShell('البطاقات', `<section class="page-head"><span class="eyebrow">مِنهَاج</span><h1>البطاقات التعليمية</h1><p>راجع السؤال، ثم اكشف الإجابة واستخدم أزرار التنقل للمراجعة السريعة.</p></section><section class="card"><div id="status" class="message" role="status"></div><div id="list" class="flashcard-wrap" aria-live="polite"></div><div class="actions"><button id="prev" class="button" type="button">السابق</button><button id="next" class="button primary" type="button">التالي</button></div><button id="more" class="button" type="button" hidden>تحميل بطاقات إضافية</button></section>`);
+mountShell('البطاقات', `<style>
+.flashcard-wrap{display:grid;place-items:center;min-height:390px;padding:18px}.flashcard{width:min(720px,100%);min-height:360px;perspective:1200px;cursor:pointer;outline:none}.flashcard-inner{position:relative;width:100%;min-height:360px;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.2,.7,.2,1)}.flashcard.is-flipped .flashcard-inner{transform:rotateY(180deg)}.flashcard-face{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:38px;border:1px solid var(--color-border);border-radius:28px;background:var(--color-surface);box-shadow:var(--shadow-lg);backface-visibility:hidden;-webkit-backface-visibility:hidden}.flashcard-face.answer{transform:rotateY(180deg);background:var(--color-surface-solid)}.flashcard-face h2{font-size:clamp(24px,4vw,38px);line-height:1.5;margin:18px 0;max-width:620px}.flashcard-face p{font-size:clamp(19px,3vw,28px);line-height:1.7;max-width:620px}.flashcard-hint{color:var(--color-muted);font-size:14px}.flashcard-count{position:absolute;top:20px;inset-inline-start:24px}.flashcard{position:relative}.flashcard:focus-visible .flashcard-face{box-shadow:0 0 0 4px rgba(124,92,255,.25),var(--shadow-lg)}
+</style><section class="page-head"><span class="eyebrow">مِنهَاج</span><h1>البطاقات التعليمية</h1><p>السؤال ظاهر مباشرة. اضغط على البطاقة لتقلب وتكشف الإجابة.</p></section><section class="card"><div id="status" class="message" role="status"></div><div id="list" class="flashcard-wrap" aria-live="polite"></div><div class="actions"><button id="prev" class="button" type="button">السابق</button><button id="next" class="button primary" type="button">التالي</button></div><button id="more" class="button" type="button" hidden>تحميل بطاقات إضافية</button></section>`);
 
-const list = document.getElementById('list');
-const status = document.getElementById('status');
-const more = document.getElementById('more');
-let rows = [], index = 0, cursor = null, loading = false;
-let repositoriesPromise;
-const seenIds = new Set();
-function getRepositories() { return repositoriesPromise ??= import('../repositories/resourceRepository.js').then(m => m.repositories); }
-
-function render() {
-  const item = rows[index];
-  if (!item) { list.innerHTML = '<div class="empty">لا توجد بطاقات متاحة حاليًا.</div>'; document.getElementById('prev').disabled = true; document.getElementById('next').disabled = true; return; }
-  document.getElementById('prev').disabled = false; document.getElementById('next').disabled = false;
-  list.innerHTML = `<article class="flashcard"><span class="eyebrow">${index + 1} / ${rows.length}</span><h2>${escapeHtml(item.question || '')}</h2><details><summary>إظهار الإجابة</summary><p>${escapeHtml(item.answer || '')}</p>${item.explanation ? `<small>${escapeHtml(item.explanation)}</small>` : ''}</details></article>`;
-}
-
-async function loadMore() {
-  if (loading || !cursor && rows.length) return;
-  loading = true; more.disabled = true; status.textContent = 'جارٍ تحميل بطاقات إضافية...';
-  try {
-    const repositories = await getRepositories();
-    const result = await repositories.flashcards.page({}, 30, cursor);
-    const fresh = result.rows.filter(item => !seenIds.has(item.id));
-    fresh.forEach(item => seenIds.add(item.id));
-    rows.push(...fresh);
-    cursor = result.nextCursor;
-    more.hidden = !result.hasMore || (fresh.length === 0 && !result.nextCursor);
-    status.textContent = '';
-    render();
-  } catch (error) { console.error('[flashcards.load]', error); status.textContent = 'تعذر تحميل البطاقات.'; }
-  finally { loading = false; more.disabled = false; }
-}
-
-document.getElementById('prev').onclick = () => { if (rows.length) { index = index ? index - 1 : rows.length - 1; render(); } };
-document.getElementById('next').onclick = () => { if (rows.length) { index = index + 1 < rows.length ? index + 1 : 0; render(); } };
-more.onclick = loadMore;
-loadMore();
+const list=document.getElementById('list'),status=document.getElementById('status'),more=document.getElementById('more');
+let rows=[],index=0,cursor=null,loading=false;let repositoriesPromise;const seenIds=new Set();
+function getRepositories(){return repositoriesPromise??=import('../repositories/resourceRepository.js').then(m=>m.repositories)}
+function render(){const item=rows[index];if(!item){list.innerHTML='<div class="empty">لا توجد بطاقات متاحة حاليًا.</div>';prev.disabled=true;next.disabled=true;return}prev.disabled=false;next.disabled=false;const question=escapeHtml(item.question||'');const answer=escapeHtml(item.answer||'');const explanation=item.explanation?`<small class="flashcard-hint">${escapeHtml(item.explanation)}</small>`:'';list.innerHTML=`<article class="flashcard" tabindex="0" role="button" aria-label="اضغط لقلب البطاقة"><div class="flashcard-inner"><div class="flashcard-face question"><span class="eyebrow">السؤال</span><span class="flashcard-count">${index+1} / ${rows.length}</span><h2>${question}</h2><span class="flashcard-hint">اضغط لإظهار الإجابة</span></div><div class="flashcard-face answer"><span class="eyebrow">الإجابة</span><span class="flashcard-count">${index+1} / ${rows.length}</span><p>${answer}</p>${explanation}<span class="flashcard-hint">اضغط للعودة للسؤال</span></div></div></article>`;const card=list.querySelector('.flashcard');const flip=()=>card.classList.toggle('is-flipped');card.onclick=flip;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();flip()}}}
+async function loadMore(){if(loading||(!cursor&&rows.length))return;loading=true;more.disabled=true;status.textContent='جارٍ تحميل بطاقات إضافية...';try{const repositories=await getRepositories();const result=await repositories.flashcards.page({},30,cursor);const fresh=result.rows.filter(x=>!seenIds.has(x.id));fresh.forEach(x=>seenIds.add(x.id));rows.push(...fresh);cursor=result.nextCursor;more.hidden=!result.hasMore||(fresh.length===0&&!result.nextCursor);status.textContent='';render()}catch(error){console.error('[flashcards.load]',error);status.textContent='تعذر تحميل البطاقات.'}finally{loading=false;more.disabled=false}}
+prev.onclick=()=>{if(rows.length){index=index?index-1:rows.length-1;render()}};next.onclick=()=>{if(rows.length){index=index+1<rows.length?index+1:0;render()}};more.onclick=loadMore;loadMore();
