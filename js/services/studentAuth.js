@@ -60,14 +60,22 @@ export async function saveStudentProfile({name,identityNumber=''}){
 }
 
 export function authErrorMessage(error){
-  const code=error?.code||'';
+  const code=error?.code||error?.message||'';
   const map={
     'auth/email-already-in-use':'هذا البريد مستخدم بالفعل.',
     'auth/invalid-email':'البريد الإلكتروني غير صحيح.',
     'auth/weak-password':'كلمة المرور ضعيفة. استخدم 6 أحرف على الأقل.',
     'auth/invalid-credential':'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+    'auth/user-not-found':'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+    'auth/wrong-password':'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
     'auth/user-disabled':'هذا الحساب معطل.',
-    'auth/too-many-requests':'تمت محاولات كثيرة. جرّب لاحقًا.'
+    'auth/too-many-requests':'تمت محاولات كثيرة. جرّب لاحقًا.',
+    'auth/network-request-failed':'تعذر الاتصال بالخدمة. تحقق من الإنترنت وحاول مرة أخرى.',
+    STUDENT_NAME_REQUIRED:'اكتب اسم الطالب.',
+    STUDENT_EMAIL_REQUIRED:'اكتب البريد الإلكتروني.',
+    STUDENT_PASSWORD_SHORT:'كلمة المرور يجب أن تكون 6 أحرف على الأقل.',
+    STUDENT_ID_INVALID:'رقم الهوية يجب أن يحتوي على أرقام فقط وبطول 4 إلى 32 رقمًا.',
+    STUDENT_LOGIN_REQUIRED:'أدخل البريد الإلكتروني وكلمة المرور.'
   };
-  return map[code]||({STUDENT_ID_INVALID:'رقم الهوية يجب أن يحتوي على أرقام فقط وبطول مناسب.',STUDENT_PASSWORD_SHORT:'كلمة المرور يجب أن تكون 6 أحرف على الأقل.'}[error?.message]||'تعذر إكمال العملية.');
+  return map[code]||'تعذر إكمال العملية. حاول مرة أخرى.';
 }
