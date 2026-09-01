@@ -11,13 +11,7 @@ service cloud.firestore {
     function canonicalRole() { return request.resource.data.role in ['reviewer','content_admin','super_admin']; }
     function validAdminWrite() { return request.resource.data.active is bool && request.resource.data.role is string && canonicalRole(); }
     function validId(id) { return id is string && id.size() > 0 && id.size() <= 128; }
-
-    match /admins/{uid} {
-      allow get: if signedIn() && (request.auth.uid == uid || superAdmin());
-      allow list: if superAdmin();
-      allow create, update: if superAdmin() && validAdminWrite();
-      allow delete: if false;
-    }
+    match /admins/{uid} { allow get: if signedIn() && (request.auth.uid == uid || superAdmin()); allow list: if superAdmin(); allow create, update: if superAdmin() && validAdminWrite(); allow delete: if false; }
     match /branches/{id} { allow read: if true; allow write: if superAdmin(); }
     match /categories/{id} { allow read: if true; allow write: if superAdmin(); }
     match /subjects/{id} { allow read: if true; allow write: if contentAdmin(); }
@@ -28,29 +22,18 @@ service cloud.firestore {
     match /curriculumUnits/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /templates/{id} { allow read: if contentAdmin(); allow create, update, delete: if contentAdmin(); }
     match /sourceRegistry/{id} { allow read: if reviewer(); allow create, update, delete: if reviewer(); }
-
     match /suggestions/{id} {
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['title','contentType','studentName','url','branchId','subjectId','level','foundationType','type','description','keywords','status','createdAt','updatedAt'])
+        && request.resource.data.keys().hasOnly(['title','contentType','studentName','url','branchId','subjectId','level','foundationType','type','description','keywords','status','createdAt','updatedAt','question','answer'])
         && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200
-        && request.resource.data.contentType in ['resource','foundation']
-        && request.resource.data.url is string && request.resource.data.url.size() > 0
+        && request.resource.data.contentType in ['resource','foundation','flashcard']
         && request.resource.data.branchId is string && request.resource.data.subjectId is string
-        && request.resource.data.status == 'pending' && request.resource.data.createdAt is timestamp;
+        && request.resource.data.status == 'pending' && request.resource.data.createdAt is timestamp
+        && (request.resource.data.contentType == 'flashcard' ? (request.resource.data.question is string && request.resource.data.question.size() > 0 && request.resource.data.answer is string && request.resource.data.answer.size() > 0) : (request.resource.data.url is string && request.resource.data.url.size() > 0));
       allow read, update, delete: if reviewer();
     }
-    match /problemReports/{id} {
-      allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['sourceId','sourceTitle','kind','description','status','createdAt'])
-        && request.resource.data.description is string && request.resource.data.description.size() > 0 && request.resource.data.description.size() <= 2000
-        && request.resource.data.kind is string && request.resource.data.status == 'open' && request.resource.data.createdAt is timestamp;
-      allow read, update, delete: if reviewer();
-    }
-    match /adminLogs/{id} {
-      allow read: if superAdmin();
-      allow create: if activeAdmin() && request.resource.data.adminUid == request.auth.uid && request.resource.data.role in ['reviewer','content_admin','super_admin','superadmin','admin'];
-      allow update, delete: if false;
-    }
+    match /problemReports/{id} { allow create: if signedIn() && request.resource.data.keys().hasOnly(['sourceId','sourceTitle','kind','description','status','createdAt']) && request.resource.data.description is string && request.resource.data.description.size() > 0 && request.resource.data.description.size() <= 2000 && request.resource.data.kind is string && request.resource.data.status == 'open' && request.resource.data.createdAt is timestamp; allow read, update, delete: if reviewer(); }
+    match /adminLogs/{id} { allow read: if superAdmin(); allow create: if activeAdmin() && request.resource.data.adminUid == request.auth.uid && request.resource.data.role in ['reviewer','content_admin','super_admin','superadmin','admin']; allow update, delete: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }
