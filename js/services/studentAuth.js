@@ -28,6 +28,7 @@ export async function registerStudent({name,email,password,identityNumber=''}){
     role:'student',
     identityNumber:safeIdentity||null,
     createdAt:serverTimestamp(),
+    lastLoginAt:serverTimestamp(),
     updatedAt:serverTimestamp()
   });
   return credential.user;
@@ -37,6 +38,13 @@ export async function loginStudent(email,password){
   const safeEmail=clean(email).toLowerCase();
   if(!safeEmail||!password) throw Error('STUDENT_LOGIN_REQUIRED');
   const credential=await signInWithEmailAndPassword(auth,safeEmail,password);
+  await setDoc(doc(db,USERS,credential.user.uid),{
+    name:credential.user.displayName||safeEmail.split('@')[0],
+    email:credential.user.email||safeEmail,
+    role:'student',
+    lastLoginAt:serverTimestamp(),
+    updatedAt:serverTimestamp()
+  },{merge:true});
   return credential.user;
 }
 
