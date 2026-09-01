@@ -3,11 +3,20 @@ import { db } from '../services/firebase.js';
 import { currentAdmin, hasRole } from '../services/firebase/adminCore.js';
 import { firebaseConfig } from '../config/firebaseConfig.js';
 import { configs } from './data.js';
-import { collection, doc, addDoc, updateDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+import { collection, doc, addDoc, updateDoc, setDoc, serverTimestamp, getDocs, query, orderBy } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (v='') => String(v).replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
 let activeCollection = 'branches';
+
+async function options(name) {
+  try {
+    const snap = await getDocs(query(collection(db, name), orderBy('order')));
+    return snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b) => (Number(a.order)||0)-(Number(b.order)||0)).filter(x => x.active !== false || true);
+  } catch {
+    try { return await getAllSmall(name, 1000, true); } catch { return []; }
+  }
+}
 
 const labels = {
   name:'الاسم', stableId:'المعرّف الثابت', description:'الشرح البسيط', icon:'الأيقونة', order:'الترتيب',
@@ -31,8 +40,9 @@ const placeholders = {
   problem:'صف المشكلة باختصار...', solution:'اكتب الحل...', steps:'اكتب خطوات الحل...', notes:'ملاحظات إضافية...'
 };
 
-async function options(name) {
-  return getAllSmall(name, 100, true);
+async function getRelationOptions(name) {
+  const rows = await options(name);
+  return rows.filter(Boolean);
 }
 
 function textField(key, type, value) {
@@ -56,7 +66,7 @@ function selectField(key, label, items, value, multiple=false, required=false) {
     const inactive = x.active === false ? ' (غير نشط)' : '';
     return `<option value="${esc(x.id)}" ${selected.has(String(x.id))?'selected':''}>${esc(name)}${inactive}</option>`;
   }).join('');
-  const hint = multiple ? `<small class="muted">يمكن اختيار أكثر من فرع. استخدم Ctrl/⌘ للاختيار المتعدد.</small>` : '';
+  const hint = multiple ? `<small class="muted">يمكن اختيار أكثر من فرع.</small>` : '';
   return `<label>${esc(label)}${required ? ' <small class="muted">مطلوب</small>' : ''}<select name="${esc(key)}" ${multiple ? 'multiple size="7"' : ''} ${required?'required':''}>${empty}${optionsHtml}</select>${hint}</label>`;
 }
 
@@ -64,9 +74,9 @@ async function buildFields(collectionName, row) {
   const cfg = configs[collectionName];
   if (!cfg) return '';
   const [branches, subjects, categories] = await Promise.all([
-    options('branches'), options('subjects'), options('categories')
+    getRelationOptions('branches'), getRelationOptions('subjects'), getRelationOptions('categories')
   ]);
-  const resources = collectionName === 'sourceRegistry' ? await options('resources') : [];
+  const resources = collectionName === 'sourceRegistry' ? await getRelationOptions('resources') : [];
   let html = '<div class="form-grid">';
   for (const [key,type] of Object.entries(cfg.fields)) {
     if (key === 'branchIds') html += selectField(key, 'الفروع', branches, row[key], true, collectionName === 'resources' || collectionName === 'foundations');
