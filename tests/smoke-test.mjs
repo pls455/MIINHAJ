@@ -9,7 +9,7 @@ const required = [
   'js/repositories/resourceRepository.js','js/repositories/solutionRepository.js',
   'js/repositories/foundationRepository.js','js/services/ai/aiService.js',
   'worker/src/index.js','worker/wrangler.toml',
-  'admin/index.html','admin/problem-reports.html','admin/suggestions.html'
+  'admin/index.html','admin/dashboard.html','admin/students.html','admin/problem-reports.html','admin/suggestions.html','js/admin/students.js'
 ];
 const htmlFiles = [], jsFiles = [], failures = [];
 function walk(dir, matcher, output) {
@@ -65,6 +65,8 @@ try {
     if (!rules.includes(`'${role}'`)) failures.push(`Firestore role missing from rules: ${role}`);
   }
   if (!rules.includes('canonicalRole()')) failures.push('Firestore admin writes are missing canonical role validation');
+  if (!rules.includes('lastLoginAt')) failures.push('Student profiles are missing lastLoginAt security coverage');
+  if (!/match \/users\/\{uid\}[\s\S]*allow list: if superAdmin\(\);/.test(rules)) failures.push('Student registry is not protected by superAdmin list access');
 } catch (error) {
   failures.push(`firestore.rules unreadable: ${error.message}`);
 }
