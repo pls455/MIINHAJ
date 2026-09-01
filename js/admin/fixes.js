@@ -2,12 +2,12 @@ import { getAllSmall, getOne, resourceRepository } from '../repositories/resourc
 import { db } from '../services/firebase.js';
 import { currentAdmin, hasRole } from '../services/firebase/adminCore.js';
 import { firebaseConfig } from '../config/firebaseConfig.js';
-import { collection, doc, addDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+import { configs } from './data.js';
+import { collection, doc, addDoc, updateDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (v='') => String(v).replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
 let activeCollection = 'branches';
-const roleNames={superadmin:'مدير النظام',content_admin:'مدير المحتوى',reviewer:'مراجع',super_admin:'مدير النظام'};
 
 async function options(name) {
   try { return await getAllSmall(name, 100, true); } catch { return []; }
@@ -27,7 +27,7 @@ function selectField(key, label, items, value, multiple=false) {
 }
 
 async function buildFields(collectionName, row) {
-  const cfg = window.__minhajAdminConfigs?.[collectionName];
+  const cfg = configs[collectionName];
   if (!cfg) return '';
   const [branches, subjects, categories] = await Promise.all([options('branches'),options('subjects'),options('categories')]);
   const resources = collectionName==='sourceRegistry' ? await options('resources') : [];
@@ -46,7 +46,7 @@ async function buildFields(collectionName, row) {
 }
 
 function payload(form, collectionName) {
-  const cfg = window.__minhajAdminConfigs?.[collectionName], out = {};
+  const cfg = configs[collectionName], out = {};
   for (const [key,type] of Object.entries(cfg.fields)) {
     const el = form.elements[key]; if (!el) continue;
     if (type === 'checkbox') out[key] = el.checked;
@@ -60,50 +60,34 @@ function payload(form, collectionName) {
 }
 
 async function createFirebaseUser(email,password){
-  if(!firebaseConfig.apiKey) throw Error('إعداد Firebase API key غير موجود.');
   const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${encodeURIComponent(firebaseConfig.apiKey)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,returnSecureToken:false})});
   const d=await r.json().catch(()=>({}));
-  if(!r.ok) { const code=d?.error?.message||''; const map={EMAIL_EXISTS:'البريد مستخدم مسبقًا.',INVALID_EMAIL:'البريد الإلكتروني غير صالح.',WEAK_PASSWORD:'كلمة المرور ضعيفة. استخدم 6 أحرف على الأقل.'}; throw Error(map[code]||'تعذر إنشاء حساب المشرف في Firebase Authentication.'); }
+  if(!r.ok){const code=d?.error?.message||'';const map={EMAIL_EXISTS:'البريد مستخدم مسبقًا.',INVALID_EMAIL:'البريد الإلكتروني غير صالح.',WEAK_PASSWORD:'كلمة المرور ضعيفة. استخدم 6 أحرف على الأقل.'};throw Error(map[code]||'تعذر إنشاء حساب المشرف في Firebase Authentication.');}
   return d.localId;
 }
 
 async function saveAdmin(row,p){
-  const email=String(p.email||'').trim().toLowerCase(), password=String(p.password||'');
-  if(!email) throw Error('أدخل البريد الإلكتروني للمشرف.');
-  if(!row?.id && password.length<6) throw Error('كلمة المرور يجب أن تحتوي على 6 أحرف على الأقل.');
+  const email=String(p.email||'').trim().toLowerCase(),password=String(p.password||'');
+  if(!email)throw Error('أدخل البريد الإلكتروني للمشرف.');
+  if(!row?.id&&password.length<6)throw Error('كلمة المرور يجب أن تحتوي على 6 أحرف على الأقل.');
   const role=['reviewer','content_admin','super_admin'].includes(p.role)?p.role:'reviewer';
-  if(row?.id){const patch={email,role,active:Boolean(p.active),updatedAt:serverTimestamp()};await updateDoc(doc(db,'admins',row.id),patch);return row.id;}
+  if(row?.id){await updateDoc(doc(db,'admins',row.id),{email,role,active:Boolean(p.active),updatedAt:serverTimestamp()});return row.id;}
   const uid=await createFirebaseUser(email,password);
-  await updateDoc(doc(db,'admins',uid),{email,role,active:p.active!==false,createdAt:serverTimestamp(),updatedAt:serverTimestamp()}).catch(async()=>{await addDoc(collection(db,'admins'),{email,role,active:true,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});});
+  await setDoc(doc(db,'admins',uid),{email,role,active:p.active!==false,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
   return uid;
 }
 
-async function openEditor(id=null) {
-  const admin = await currentAdmin();
-  const cfg = window.__minhajAdminConfigs?.[activeCollection];
-  if (!cfg || !hasRole(admin?.role,cfg.writeRole||cfg.role)) return;
-  const row = id ? await getOne(activeCollection, id) : {};
-  if (id && !row) { alert('العنصر غير موجود.'); return; }
-  const editor = $('editor'); if (!editor) return;
-  editor.innerHTML = `<form class="form-card admin-editor" id="fixedEditForm"><div class="section-head"><h3>${id?'تعديل':'إضافة'} ${esc(cfg.label)}</h3><button type="button" id="fixedClose" class="button">إغلاق</button></div><p class="muted">اختر العلاقات من القوائم بدل كتابة المعرّفات يدويًا.</p><div id="fixedFields">جاري تجهيز الحقول...</div><button class="button primary" type="submit">حفظ</button><p id="fixedMsg" class="message"></p></form>`;
-  $('fixedFields').innerHTML = await buildFields(activeCollection, row || {});
-  $('fixedClose').onclick = () => editor.replaceChildren();
-  $('fixedEditForm').onsubmit = async (e) => {
-    e.preventDefault(); const msg=$('fixedMsg'), p=payload(e.currentTarget,activeCollection);
-    try {
-      if(activeCollection==='admins') await saveAdmin(row,p);
-      else if(activeCollection==='resources') await resourceRepository.saveResource(id,p);
-      else if(id) await updateDoc(doc(db,activeCollection,id),{...p,updatedAt:serverTimestamp()});
-      else await addDoc(collection(db,activeCollection),{...p,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
-      msg.textContent='تم الحفظ بنجاح.';setTimeout(()=>editor.replaceChildren(),350);document.querySelector('#searchBtn')?.click();
-    } catch(err){console.error('[admin.fixed-editor]',err);msg.textContent=err?.message||'تعذر حفظ البيانات.';msg.className='message error'}
-  };
+async function openEditor(id=null){
+  const admin=await currentAdmin(),cfg=configs[activeCollection];
+  if(!cfg||!hasRole(admin?.role,cfg.writeRole||cfg.role))return;
+  const row=id?await getOne(activeCollection,id):{};if(id&&!row){alert('العنصر غير موجود.');return;}
+  const editor=$('editor');if(!editor)return;
+  editor.innerHTML=`<form class="form-card admin-editor" id="fixedEditForm"><div class="section-head"><h3>${id?'تعديل':'إضافة'} ${esc(cfg.label)}</h3><button type="button" id="fixedClose" class="button">إغلاق</button></div><p class="muted">اختر العلاقات من القوائم بدل كتابة المعرّفات يدويًا.</p><div id="fixedFields">جاري تجهيز الحقول...</div><button class="button primary" type="submit">حفظ</button><p id="fixedMsg" class="message"></p></form>`;
+  $('fixedFields').innerHTML=await buildFields(activeCollection,row||{});
+  $('fixedClose').onclick=()=>editor.replaceChildren();
+  $('fixedEditForm').onsubmit=async e=>{e.preventDefault();const msg=$('fixedMsg'),p=payload(e.currentTarget,activeCollection);try{if(activeCollection==='admins')await saveAdmin(row,p);else if(activeCollection==='resources')await resourceRepository.saveResource(id,p);else if(id)await updateDoc(doc(db,activeCollection,id),{...p,updatedAt:serverTimestamp()});else await addDoc(collection(db,activeCollection),{...p,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});msg.textContent='تم الحفظ بنجاح.';setTimeout(()=>editor.replaceChildren(),350);document.querySelector('#searchBtn')?.click();}catch(err){console.error('[admin.fixed-editor]',err);msg.textContent=err?.message||'تعذر حفظ البيانات.';msg.className='message error'}};
   editor.querySelector('input,textarea,select')?.focus();
 }
 
-document.addEventListener('click',(event)=>{const nav=event.target.closest('[data-collection]');if(nav)activeCollection=nav.dataset.collection;},true);
-document.addEventListener('click',(event)=>{const edit=event.target.closest('[data-edit]'),add=event.target.closest('#add');if(!edit&&!add)return;event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();openEditor(edit?.dataset.edit||null).catch(err=>{console.error(err);alert(err?.message||'تعذر فتح المحرر.')});},true);
-
-const boot=()=>{if(window.__minhajAdminConfigs)return;};
-const observer=new MutationObserver(()=>{if(window.adminApi?.configs)window.__minhajAdminConfigs=window.adminApi.configs;});observer.observe(document.documentElement,{subtree:true,childList:true});
-setTimeout(()=>{if(window.adminApi?.configs)window.__minhajAdminConfigs=window.adminApi.configs;},0);
+document.addEventListener('click',event=>{const nav=event.target.closest('[data-collection]');if(nav)activeCollection=nav.dataset.collection;},true);
+document.addEventListener('click',event=>{const edit=event.target.closest('[data-edit]'),add=event.target.closest('#add');if(!edit&&!add)return;event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();openEditor(edit?.dataset.edit||null).catch(err=>{console.error(err);alert(err?.message||'تعذر فتح المحرر.')});},true);
