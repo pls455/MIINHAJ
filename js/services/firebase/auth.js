@@ -27,9 +27,22 @@ export async function getCurrentAdmin(user = auth.currentUser) {
 }
 
 export async function requireAuthenticatedAdmin() {
-  const user = auth.currentUser;
+  const user = await waitForAuthUser();
   if (!user) throw new Error("AUTH_REQUIRED");
   const admin = await getCurrentAdmin(user);
   if (!admin?.active) throw new Error("ADMIN_ACCESS_REQUIRED");
   return { user, admin };
+}
+
+function waitForAuthUser() {
+  if (auth.currentUser) return Promise.resolve(auth.currentUser);
+  return new Promise(resolve => {
+    let settled = false;
+    const unsubscribe = onAuthStateChanged(auth, user => {
+      if (settled) return;
+      settled = true;
+      unsubscribe();
+      resolve(user);
+    });
+  });
 }
