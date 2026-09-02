@@ -1,6 +1,7 @@
 import { getDoc, getDocs, doc, query, where, limit, collection, addDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
 import { db } from '../services/firebase.js';
 import { writeAdminLog } from '../services/firebase/adminLogRepository.js';
+import { hasRole, ROLES } from '../services/firebase/adminCore.js';
 
 export async function logAction(admin, action, targetCollection, targetId, details = '') {
   const previous = { uid: admin?.uid || '', email: admin?.email || '' };
@@ -18,6 +19,7 @@ export async function updateStatus(collectionName,id,status,admin){const ref=doc
   if(collectionName==='sourceRegistry'){
     if(!['pending_review','approved','rejected'].includes(status))throw Error('حالة المراجعة غير صالحة.');
     if(status==='approved'){
+      if(!hasRole(admin?.role,ROLES.CONTENT_ADMIN))throw Error('اعتماد ونشر المصادر يحتاج صلاحية مدير المحتوى أو المدير العام.');
       const normalized=await normalizeRegistry(current,id);const url=normalizeSourceUrl(current.url||current.sourceUrl||current.link||'');const name=String(current.name||current.title||current.originalTitle||'').trim();
       if(!url||!name||!normalized.subjectId||!normalized.branchIds.length)throw Error('لا يمكن اعتماد المصدر قبل اكتمال العنوان والرابط والفرع والمادة. افتح التعديل وأكمل البيانات المطلوبة.');
       const existing=await resourceWithSameUrl(url);if(existing)throw Error('هذا المصدر موجود مسبقًا ضمن المصادر المنشورة.');
