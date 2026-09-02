@@ -1,6 +1,6 @@
 import { mountShell } from '../components/layout.js';
 import { createSuggestion } from '../repositories/suggestionRepository.js';
-import { getPage } from '../repositories/resourceRepository.js';
+import { getAllSmall } from '../repositories/resourceRepository.js';
 import { setMessage, setBusy } from '../core/utils.js';
 
 mountShell('إرسال اقتراح', `
@@ -43,17 +43,19 @@ const subjectSelect = document.getElementById('subject');
 
 async function loadAcademicOptions() {
   try {
-    const [branchPage, subjectPage] = await Promise.all([
-      getPage('branches', { active: true }, 100),
-      getPage('subjects', { active: true }, 100)
+    const [branches, subjects] = await Promise.all([
+      getAllSmall('branches', 100),
+      getAllSmall('subjects', 100)
     ]);
-    for (const item of branchPage.rows || []) {
+    branchSelect.replaceChildren(new Option('اختر الفرع', ''));
+    subjectSelect.replaceChildren(new Option('اختر المادة', ''));
+    for (const item of branches) {
       const option = document.createElement('option');
       option.value = item.id;
       option.textContent = item.name || item.title || item.id;
       branchSelect.append(option);
     }
-    for (const item of subjectPage.rows || []) {
+    for (const item of subjects) {
       const option = document.createElement('option');
       option.value = item.id;
       option.textContent = item.name || item.title || item.id;
