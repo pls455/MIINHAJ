@@ -1,7 +1,7 @@
 import { getDoc, getDocs, doc, query, where, limit, collection, addDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
 import { db } from '../services/firebase.js';
 import { writeAdminLog } from '../services/firebase/adminLogRepository.js';
-import { hasRole, ROLES } from '../services/firebase/adminCore.js';
+import { currentAdmin, hasRole, ROLES } from '../services/firebase/adminCore.js';
 
 export async function logAction(admin, action, targetCollection, targetId, details = '') {
   const previous = { uid: admin?.uid || '', email: admin?.email || '' };
@@ -32,26 +32,25 @@ async function resourceWithSameUrl(url){
   return null;
 }
 async function safeLog(admin,action,collectionName,id,details=''){
-  try{
-    await logAction(admin,action,collectionName,id,details);
-  }catch(error){
-    console.warn('[admin.status.audit] Audit log failed after the database operation completed.',error);
-  }
+  try{await logAction(admin,action,collectionName,id,details)}catch(error){console.warn('[admin.status.audit] Audit log failed after the database operation completed.',error)}
 }
 
-export async function updateStatus(collectionName,id,status,admin){const ref=doc(db,collectionName,id);const snap=await getDoc(ref);if(!snap.exists())throw Error('العنصر المطلوب غير موجود.');const current=snap.data();
+export async function updateStatus(collectionName,id,status,admin){
+  const authoritativeAdmin=await currentAdmin();
+  const actor=authoritativeAdmin||admin;
+  const ref=doc(db,collectionName,id);const snap=await getDoc(ref);if(!snap.exists())throw Error('العنصر المطلوب غير موجود.');const current=snap.data();
   if(collectionName==='sourceRegistry'){
     if(!['pending_review','approved','rejected'].includes(status))throw Error('حالة المراجعة غير صالحة.');
     if(status==='approved'){
-      if(!hasRole(admin?.role,ROLES.CONTENT_ADMIN))throw Error('اعتماد ونشر المصادر يحتاج صلاحية مدير المحتوى أو المدير العام.');
+      if(!hasRole(actor?.role,ROLES.CONTENT_ADMIN))throw Error('اعتماد ونشر المصادر يحتاج صلاحية مدير المحتوى أو المدير العام.');
       const normalized=await normalizeRegistry(current,id);const url=normalizeSourceUrl(current.url||current.sourceUrl||current.link||'');const name=String(current.name||current.title||current.originalTitle||'').trim();
       if(!url||!name||!normalized.subjectId||!normalized.branchIds.length)throw Error('لا يمكن اعتماد المصدر قبل اكتمال العنوان والرابط والفرع والمادة. افتح التعديل وأكمل البيانات المطلوبة.');
       const existing=await resourceWithSameUrl(url);if(existing)throw Error('هذا المصدر موجود مسبقًا ضمن المصادر المنشورة.');
       const published=await addDoc(collection(db,'resources'),{title:name,url,normalizedUrl:url,description:current.description||'',type:current.type||current.mimeType||'resource',subjectId:normalized.subjectId,categoryId:normalized.categoryId||'',branchIds:normalized.branchIds,keywords:Array.isArray(current.keywords)?current.keywords:[],tags:Array.isArray(current.tags)?current.tags:[],author:current.author||'',order:Number(current.order)||0,active:true,sourceId:normalized.sourceId,provider:current.provider||'google_drive',createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
       await updateDoc(ref,{name,title:name,url,branchIds:normalized.branchIds,subjectId:normalized.subjectId,categoryId:normalized.categoryId||'',status:'published',needsReview:false,active:false,publishedResourceId:published.id,publishedAt:serverTimestamp(),updatedAt:serverTimestamp()});
-      await safeLog(admin,'publish',collectionName,id,`نشر المصدر ${published.id}`);return;
+      await safeLog(actor,'publish',collectionName,id,`نشر المصدر ${published.id}`);return;
     }
-    await updateDoc(ref,{status,needsReview:status==='pending_review',active:false,updatedAt:serverTimestamp()});await safeLog(admin,`status:${status}`,collectionName,id,status);return;
+    await updateDoc(ref,{status,needsReview:status==='pending_review',active:false,updatedAt:serverTimestamp()});await safeLog(actor,`status:${status}`,collectionName,id,status);return;
   }
-  await updateDoc(ref,{status,updatedAt:serverTimestamp()});await safeLog(admin,`status:${status}`,collectionName,id,status);
+  await updateDoc(ref,{status,updatedAt:serverTimestamp()});await safeLog(actor,`status:${status}`,collectionName,id,status);
 }
