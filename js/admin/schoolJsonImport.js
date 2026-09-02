@@ -24,6 +24,7 @@ $('copy-json-template')?.addEventListener('click',async()=>{
   catch{show('تعذر النسخ تلقائيًا. انسخ القالب من المعاينة بالأسفل.','error');}
 });
 $('import-json')?.addEventListener('click',()=>document.getElementById('json-tools')?.scrollIntoView({behavior:'smooth',block:'center'}));
+$('json-file')?.addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{$('json-import-input').value=await file.text();show(`تم تحميل الملف «${file.name}». راجعه قبل الاستيراد.`,'ok');}catch{show('تعذر قراءة ملف JSON.','error');}finally{e.target.value='';}});
 $('clear-json')?.addEventListener('click',()=>{$('json-import-input').value='';$('json-import-message').textContent='';});
 $('import-json-submit')?.addEventListener('click',importJson);
 
@@ -46,8 +47,8 @@ async function importJson(){
     for(const x of parsed.directorates){
       const name=clean(x.name),code=clean(x.code);if(!name)continue;
       const found=(code&&dMap.get(`code:${norm(code)}`))||dMap.get(`name:${norm(name)}`);
-      if(found){await updateDoc(doc(db,'directorates',found.id),directoratePayload(x));Object.assign(found,x);found.name=name;found.code=code;found.governorate=clean(x.governorate);found.area=clean(x.area);directoratesUpdated++;}
-      else{const r=await addDoc(collection(db,'directorates'),{...directoratePayload(x),createdAt:serverTimestamp()});const created={id:r.id,...x,name,code,governorate:clean(x.governorate),area:clean(x.area)};if(code)dMap.set(`code:${norm(code)}`,created);dMap.set(`name:${norm(name)}`,created);directoratesAdded++;}
+      if(found){await updateDoc(doc(db,'directorates',found.id),directoratePayload(x));found.name=name;found.code=code;found.governorate=clean(x.governorate);found.area=clean(x.area);if(code)dMap.set(`code:${norm(code)}`,found);dMap.set(`name:${norm(name)}`,found);directoratesUpdated++;}
+      else{const r=await addDoc(collection(db,'directorates'),{...directoratePayload(x),createdAt:serverTimestamp()});const created={id:r.id,name,code,governorate:clean(x.governorate),area:clean(x.area)};if(code)dMap.set(`code:${norm(code)}`,created);dMap.set(`name:${norm(name)}`,created);directoratesAdded++;}
     }
     const sMap=new Map();existingS.forEach(s=>{if(s.code)sMap.set(norm(s.code),s);});
     for(const x of parsed.schools){
@@ -59,8 +60,8 @@ async function importJson(){
       else{const r=await addDoc(collection(db,'schools'),{...schoolPayload(x,d),createdAt:serverTimestamp()});sMap.set(norm(code),{id:r.id,...x});schoolsAdded++;}
     }
     try{await writeAdminLog({action:'import',collectionName:'schools',targetId:'json',details:{directoratesAdded,directoratesUpdated,schoolsAdded,schoolsUpdated,skipped}})}catch(e){console.warn('[school-json.log]',e)}
-    show(`تم الاستيراد: ${directoratesAdded} مديرية جديدة، ${directoratesUpdated} محدثة، ${schoolsAdded} مدرسة جديدة، ${schoolsUpdated} محدثة، ${skipped} متجاوزة. أعد تحميل قائمة المدارس لرؤية النتائج.`,'ok');
-    window.dispatchEvent(new CustomEvent('schools-json-imported'));
+    show(`تم الاستيراد: ${directoratesAdded} مديرية جديدة، ${directoratesUpdated} محدثة، ${schoolsAdded} مدرسة جديدة، ${schoolsUpdated} محدثة، ${skipped} متجاوزة.`,'ok');
+    setTimeout(()=>location.reload(),1200);
   }catch(e){console.error('[school-json]',e);show(e.message==='JSON_STRUCTURE'?'صيغة JSON يجب أن تحتوي على directorates و schools كمصفوفتين.':e instanceof SyntaxError?'الـ JSON غير صالح. تأكد من الأقواس والفواصل.':'تعذر استيراد البيانات. تحقق من الصلاحيات والبيانات.','error');}
   finally{button.disabled=false;}
 }
