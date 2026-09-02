@@ -46,7 +46,7 @@ export async function getFlashcard(id) {
 export async function createFlashcard(input) {
   const data = validate(input);
   const result = await addDoc(collection(db, NAME), { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-  await writeAdminLog({ action: 'create', collectionName: NAME, targetId: result.id, details: { question: data.question } });
+  try { await writeAdminLog({ action: 'create', collectionName: NAME, targetId: result.id, details: { question: data.question } }); } catch (error) { console.warn('[flashcards] admin log failed', error); }
   return result.id;
 }
 
@@ -54,11 +54,11 @@ export async function updateFlashcard(id, input) {
   if (!validId(id)) throw new Error('DOCUMENT_ID_INVALID');
   const data = validate(input);
   await updateDoc(doc(db, NAME, id), { ...data, updatedAt: serverTimestamp() });
-  await writeAdminLog({ action: 'update', collectionName: NAME, targetId: id, details: { question: data.question } });
+  try { await writeAdminLog({ action: 'update', collectionName: NAME, targetId: id, details: { question: data.question } }); } catch (error) { console.warn('[flashcards] admin log failed', error); }
 }
 
 export async function deleteFlashcard(id) {
   if (!validId(id)) throw new Error('DOCUMENT_ID_INVALID');
   await deleteDoc(doc(db, NAME, id));
-  await writeAdminLog({ action: 'delete', collectionName: NAME, targetId: id });
+  try { await writeAdminLog({ action: 'delete', collectionName: NAME, targetId: id }); } catch (error) { console.warn('[flashcards] admin log failed', error); }
 }
