@@ -2,7 +2,10 @@ import { requireAuthenticatedAdmin } from './auth.js';
 import { ROLES, ROLE_LEVELS } from '../../core/constants.js';
 
 function normalizeRole(role) {
-  if (role === 'superadmin' || role === 'admin') return ROLES.SUPER_ADMIN;
+  const value = String(role || '').trim().toLowerCase();
+  if (['superadmin','super_admin','admin','super-admin','مدير النظام','المدير العام'].includes(value)) return ROLES.SUPER_ADMIN;
+  if (['contentadmin','content_admin','content-admin','مدير المحتوى'].includes(value)) return ROLES.CONTENT_ADMIN;
+  if (['reviewer','مراجع','مراجع المصادر'].includes(value)) return ROLES.REVIEWER;
   return role;
 }
 
