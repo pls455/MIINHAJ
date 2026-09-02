@@ -9,7 +9,7 @@ const required = [
   'js/repositories/resourceRepository.js','js/repositories/solutionRepository.js',
   'js/repositories/foundationRepository.js','js/services/ai/aiService.js',
   'worker/src/index.js','worker/wrangler.toml',
-  'admin/index.html','admin/dashboard.html','admin/students.html','admin/problem-reports.html','admin/suggestions.html','js/admin/students.js'
+  'admin/index.html','admin/dashboard.html','admin/students.html','admin/problem-reports.html','admin/suggestions.html','admin/directorates.html','admin/schools.html','js/admin/students.js','js/admin/directorates.js','js/admin/schools.js'
 ];
 const htmlFiles = [], jsFiles = [], failures = [];
 function walk(dir, matcher, output) {
@@ -27,68 +27,49 @@ function checkTarget(file, raw, kind) {
   const resolved = target.startsWith('/') ? path.join(root, target.slice(1)) : path.resolve(path.dirname(file), target);
   if (!fs.existsSync(resolved)) failures.push(`${kind} missing: ${path.relative(root, file)} -> ${raw}`);
 }
-
 walk(root, name => name.endsWith('.html'), htmlFiles);
 walk(root, name => /\.m?js$/.test(name), jsFiles);
 const missing = required.filter(p => !fs.existsSync(path.join(root, p)));
-
 for (const file of htmlFiles) {
   const source = fs.readFileSync(file, 'utf8');
-  if (/<script[^>]+(?:src|type)=[^>]*(?:\.ts|tsx|react|vue)/i.test(source)) failures.push(`Forbidden frontend reference: ${path.relative(root, file)}`);
+  if (/<script[^>]+(?:src|type)=["'][^"']*(?:\.ts|tsx|react|vue)/i.test(source)) failures.push(`Forbidden frontend reference: ${path.relative(root, file)}`);
   for (const match of source.matchAll(/(?:href|src)=["']([^"']+)["']/gi)) checkTarget(file, match[1], 'HTML target');
 }
 for (const file of jsFiles) {
   const source = fs.readFileSync(file, 'utf8');
   for (const match of source.matchAll(/(?:from\s*["']|import\s*\(["'])(\.\.?\/[^"']+)["']/g)) {
-    let target = match[1];
-    if (!path.extname(target)) target += '.js';
+    let target = match[1]; if (!path.extname(target)) target += '.js';
     if (!fs.existsSync(path.resolve(path.dirname(file), target))) failures.push(`JS import missing: ${path.relative(root, file)} -> ${match[1]}`);
   }
   if (/firebasejs\/11\./.test(source)) failures.push(`Legacy Firebase SDK v11 reference: ${path.relative(root, file)}`);
   if (/services\/firebase\/firebaseConfig\.js/.test(source)) failures.push(`Legacy Firebase config import: ${path.relative(root, file)}`);
 }
-
 try {
   const indexes = JSON.parse(fs.readFileSync(path.join(root, 'firestore.indexes.json'), 'utf8'));
   if (!Array.isArray(indexes.indexes)) failures.push('firestore.indexes.json: indexes must be an array');
   const collections = new Set((indexes.indexes || []).map(index => index.collectionGroup));
-  for (const collection of ['resources','flashcards','solutions','suggestions','problemReports']) {
-    if (!collections.has(collection)) failures.push(`Missing Firestore index coverage: ${collection}`);
-  }
-} catch (error) {
-  failures.push(`firestore.indexes.json invalid: ${error.message}`);
-}
-
+  for (const collection of ['resources','flashcards','solutions','suggestions','problemReports']) if (!collections.has(collection)) failures.push(`Missing Firestore index coverage: ${collection}`);
+} catch (error) { failures.push(`firestore.indexes.json invalid: ${error.message}`); }
 try {
   const rules = fs.readFileSync(path.join(root, 'firestore.rules'), 'utf8');
-  for (const role of ['reviewer','content_admin','super_admin']) {
-    if (!rules.includes(`'${role}'`)) failures.push(`Firestore role missing from rules: ${role}`);
-  }
+  for (const role of ['reviewer','content_admin','super_admin']) if (!rules.includes(`'${role}'`)) failures.push(`Firestore role missing from rules: ${role}`);
   if (!rules.includes('canonicalRole()')) failures.push('Firestore admin writes are missing canonical role validation');
   if (!rules.includes('lastLoginAt')) failures.push('Student profiles are missing lastLoginAt security coverage');
   if (!/match \/users\/\{uid\}[\s\S]*allow list: if superAdmin\(\);/.test(rules)) failures.push('Student registry is not protected by superAdmin list access');
-} catch (error) {
-  failures.push(`firestore.rules unreadable: ${error.message}`);
-}
-
+  if (!rules.includes('match /directorates/{id}')) failures.push('Directorates collection is missing from Firestore rules');
+  if (!rules.includes('match /schools/{id}')) failures.push('Schools collection is missing from Firestore rules');
+} catch (error) { failures.push(`firestore.rules unreadable: ${error.message}`); }
 try {
   const constants = fs.readFileSync(path.join(root, 'js/core/constants.js'), 'utf8');
   const adminData = fs.readFileSync(path.join(root, 'js/admin/data.js'), 'utf8');
   if (!/ROLES\s*=/.test(constants) || !/REVIEWER/.test(constants) || !/CONTENT_ADMIN/.test(constants) || !/SUPER_ADMIN/.test(constants)) failures.push('Canonical role constants are incomplete');
   if (!/ROLES\.SUPER_ADMIN/.test(adminData) || !/ROLES\.CONTENT_ADMIN/.test(adminData)) failures.push('Admin data config is not using canonical role constants');
-} catch (error) {
-  failures.push(`Role configuration unreadable: ${error.message}`);
-}
-
+} catch (error) { failures.push(`Role configuration unreadable: ${error.message}`); }
 const adminIndex = fs.readFileSync(path.join(root, 'admin/index.html'), 'utf8');
 if (!/src=["']\.\.\/js\/admin\/index\.js["']/.test(adminIndex)) failures.push('Admin entrypoint does not use js/admin/index.js');
 if (fs.existsSync(path.join(root,'admin/index.js'))) failures.push('Orphan admin/index.js must not exist');
 if (fs.existsSync(path.join(root,'cloudflare-worker'))) failures.push('Duplicate cloudflare-worker directory must not exist');
-
 if (missing.length || failures.length) {
-  console.error('Smoke test failed');
-  if (missing.length) console.error('Missing required files:', missing);
-  for (const failure of failures) console.error(failure);
-  process.exit(1);
+  console.error('Smoke test failed'); if (missing.length) console.error('Missing required files:', missing); for (const failure of failures) console.error(failure); process.exit(1);
 }
 console.log(`Smoke test passed: ${htmlFiles.length} HTML pages and ${jsFiles.length} JS modules checked.`);
