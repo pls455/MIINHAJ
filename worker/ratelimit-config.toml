@@ -1,0 +1,3 @@
+# Cloudflare Rate Limiting API configuration reference.
+# The active binding is configured in worker/wrangler.toml.
+# 20 AI requests per minute per rate-limit key.
