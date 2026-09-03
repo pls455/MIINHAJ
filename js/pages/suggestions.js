@@ -44,8 +44,8 @@ const subjectSelect = document.getElementById('subject');
 async function loadAcademicOptions() {
   try {
     const [branches, subjects] = await Promise.all([
-      getAllSmall('branches', 100),
-      getAllSmall('subjects', 100)
+      getAllSmall('branches', 500),
+      getAllSmall('subjects', 500)
     ]);
     branchSelect.replaceChildren(new Option('اختر الفرع', ''));
     subjectSelect.replaceChildren(new Option('اختر المادة', ''));
