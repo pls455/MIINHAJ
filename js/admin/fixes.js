@@ -37,7 +37,8 @@ const placeholders = {
   title:'اكتب عنوانًا واضحًا للمصدر...', url:'https://example.com', author:'اختياري',
   keywords:'اكتب الكلمات مفصولة بفواصل', tags:'اكتب الوسوم مفصولة بفواصل', order:'مثال: 1',
   question:'اكتب السؤال...', answer:'اكتب الإجابة...', explanation:'شرح إضافي إن وجد',
-  problem:'صف المشكلة باختصار...', solution:'اكتب الحل...', steps:'اكتب خطوات الحل...', notes:'ملاحظات إضافية...'
+  problem:'صف المشكلة باختصار...', solution:'اكتب الحل...', steps:'اكتب خطوات الحل...', notes:'ملاحظات إضافية...',
+  sourceId:'اختياري، معرّف المصدر الأصلي أو الخارجي'
 };
 
 async function getRelationOptions(name) {
@@ -49,7 +50,7 @@ function textField(key, type, value) {
   const label = labels[key] || key;
   const v = Array.isArray(value) ? value.join(', ') : (value ?? '');
   const placeholder = placeholders[key] || '';
-  const optional = ['stableId','icon','author','keywords','tags','order','notes','reviewerNote','adminNote','description'].includes(key) ? ' <small class="muted">اختياري</small>' : '';
+  const optional = ['stableId','icon','author','keywords','tags','order','notes','reviewerNote','adminNote','description','sourceId'].includes(key) ? ' <small class="muted">اختياري</small>' : '';
   if (type === 'checkbox') return `<label class="check"><input name="${esc(key)}" type="checkbox" ${value ? 'checked' : ''}> ${esc(label)}</label>`;
   if (type === 'textarea') return `<label>${esc(label)}${optional}<textarea name="${esc(key)}" placeholder="${esc(placeholder)}">${esc(v)}</textarea></label>`;
   return `<label>${esc(label)}${optional}<input name="${esc(key)}" type="${type === 'url' || type === 'email' ? type : 'text'}" value="${esc(v)}" placeholder="${esc(placeholder)}"></label>`;
@@ -76,14 +77,12 @@ async function buildFields(collectionName, row) {
   const [branches, subjects, categories] = await Promise.all([
     getRelationOptions('branches'), getRelationOptions('subjects'), getRelationOptions('categories')
   ]);
-  const resources = collectionName === 'sourceRegistry' ? await getRelationOptions('resources') : [];
   let html = '<div class="form-grid">';
   for (const [key,type] of Object.entries(cfg.fields)) {
     if (key === 'branchIds') html += selectField(key, 'الفروع', branches, row[key], true, collectionName === 'resources' || collectionName === 'foundations');
     else if (key === 'branchId') html += selectField(key, 'الفرع', branches, row[key], false, false);
     else if (key === 'subjectId') html += selectField(key, 'المادة', subjects, row[key], false, collectionName === 'resources');
     else if (key === 'categoryId') html += selectField(key, 'التصنيف', categories, row[key], false, false);
-    else if (key === 'sourceId' && collectionName === 'sourceRegistry') html += selectField(key, 'المصدر المرتبط', resources, row[key], false, false);
     else if (collectionName === 'admins' && key === 'role') html += `<label>الصلاحية <small class="muted">مطلوب</small><select name="role" required><option value="reviewer" ${row.role==='reviewer'?'selected':''}>مراجع</option><option value="content_admin" ${row.role==='content_admin'?'selected':''}>مدير محتوى</option><option value="super_admin" ${['super_admin','superadmin'].includes(row.role)?'selected':''}>مدير النظام</option></select></label>`;
     else if (key === 'level') html += `<label>المستوى <select name="level"><option value="">اختر المستوى</option>${['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر'].map(x=>`<option value="${esc(x)}" ${String(row[key]||'')===x?'selected':''}>${esc(x)}</option>`).join('')}</select></label>`;
     else html += textField(key,type,row[key]);
