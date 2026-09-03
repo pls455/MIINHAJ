@@ -1,3 +1,4 @@
+import { mountShell } from '../components/layout.js';
 import { initStudentAuth } from '../services/studentAuth.js';
 import { getSharedStudentTest, getMyStudentTest } from '../repositories/studentTestRepository.js';
 import { escapeHtml } from '../core/utils.js';
