@@ -1,7 +1,7 @@
 import { doc, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
 import { db } from '../services/firebase.js';
 import { currentAdmin, hasRole, ROLES } from '../services/firebase/adminCore.js';
-import { writeAdminLog } from './adminLogRepository.js';
+import { writeAdminLog } from '../services/firebase/adminLogRepository.js';
 import { updateStatus } from './audit.js';
 
 function collectionName(){
