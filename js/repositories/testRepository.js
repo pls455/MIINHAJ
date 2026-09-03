@@ -3,13 +3,18 @@ import { collection, doc, getDoc, getDocs, limit, query, where } from 'https://w
 
 const MAX_TESTS = 30;
 const MAX_QUESTIONS = 100;
-const TYPES = new Set(['mcq','true_false','multi_select']);
+const TYPES = new Set(['mcq','true_false','multi_select','ordering']);
 
 function cleanQuestion(q, index) {
   const type = TYPES.has(q?.type) ? q.type : 'mcq';
-  const options = Array.isArray(q?.options) ? q.options.map(v => String(v ?? '').trim()).filter(Boolean).slice(0, 6) : [];
+  const options = Array.isArray(q?.options) ? q.options.map(v => String(v ?? '').trim()).filter(Boolean).slice(0, 8) : [];
   const rawAnswer = q?.answer;
   if (!q?.question) throw new Error(`TEST_QUESTION_${index + 1}_INVALID`);
+  if (type === 'ordering') {
+    const answer = Array.isArray(rawAnswer) ? rawAnswer.map(v => String(v ?? '').trim()).filter(Boolean) : [];
+    if (options.length < 2 || answer.length !== options.length || new Set(answer).size !== answer.length || answer.some(v => !options.includes(v))) throw new Error(`TEST_QUESTION_${index + 1}_ANSWER_INVALID`);
+    return { id: String(q.id || `q${index + 1}`), question: String(q.question).trim(), type, options, answer, explanation: String(q.explanation ?? '').trim().slice(0, 2000), points: Math.max(1, Math.min(100, Number(q.points) || 1)) };
+  }
   if (!options.length) throw new Error(`TEST_QUESTION_${index + 1}_OPTIONS_REQUIRED`);
   let answer;
   if (type === 'multi_select') {
