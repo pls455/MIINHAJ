@@ -1,4 +1,4 @@
-import { getDoc, getDocs, doc, query, where, limit, collection, addDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+import { getDoc, getDocs, doc, query, where, limit, collection, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
 import { db } from '../services/firebase.js';
 import { writeAdminLog } from '../services/firebase/adminLogRepository.js';
 import { currentAdmin, hasRole, ROLES } from '../services/firebase/adminCore.js';
@@ -46,9 +46,12 @@ export async function updateStatus(collectionName,id,status,admin){
       const normalized=await normalizeRegistry(current,id);const url=normalizeSourceUrl(current.url||current.sourceUrl||current.link||'');const name=String(current.name||current.title||current.originalTitle||'').trim();
       if(!url||!name||!normalized.subjectId||!normalized.branchIds.length)throw Error('لا يمكن اعتماد المصدر قبل اكتمال العنوان والرابط والفرع والمادة. افتح التعديل وأكمل البيانات المطلوبة.');
       const existing=await resourceWithSameUrl(url);if(existing)throw Error('هذا المصدر موجود مسبقًا ضمن المصادر المنشورة.');
-      const published=await addDoc(collection(db,'resources'),{title:name,url,normalizedUrl:url,description:current.description||'',type:current.type||current.mimeType||'resource',subjectId:normalized.subjectId,categoryId:normalized.categoryId||'',branchIds:normalized.branchIds,keywords:Array.isArray(current.keywords)?current.keywords:[],tags:Array.isArray(current.tags)?current.tags:[],author:current.author||'',order:Number(current.order)||0,active:true,sourceId:normalized.sourceId,provider:current.provider||'google_drive',createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
-      await updateDoc(ref,{name,title:name,url,branchIds:normalized.branchIds,subjectId:normalized.subjectId,categoryId:normalized.categoryId||'',status:'published',needsReview:false,active:false,publishedResourceId:published.id,publishedAt:serverTimestamp(),updatedAt:serverTimestamp()});
-      await safeLog(actor,'publish',collectionName,id,`نشر المصدر ${published.id}`);return;
+      const batch=writeBatch(db);
+      const publishedRef=doc(collection(db,'resources'));
+      batch.set(publishedRef,{title:name,url,normalizedUrl:url,description:current.description||'',type:current.type||current.mimeType||'resource',subjectId:normalized.subjectId,categoryId:normalized.categoryId||'',branchIds:normalized.branchIds,keywords:Array.isArray(current.keywords)?current.keywords:[],tags:Array.isArray(current.tags)?current.tags:[],author:current.author||'',order:Number(current.order)||0,active:true,sourceId:normalized.sourceId,provider:current.provider||'google_drive',createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+      batch.update(ref,{name,title:name,url,branchIds:normalized.branchIds,subjectId:normalized.subjectId,categoryId:normalized.categoryId||'',status:'published',needsReview:false,active:false,publishedResourceId:publishedRef.id,publishedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+      await batch.commit();
+      await safeLog(actor,'publish',collectionName,id,`نشر المصدر ${publishedRef.id}`);return;
     }
     await updateDoc(ref,{status,needsReview:status==='pending_review',active:false,updatedAt:serverTimestamp()});await safeLog(actor,`status:${status}`,collectionName,id,status);return;
   }
