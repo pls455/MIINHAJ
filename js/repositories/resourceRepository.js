@@ -1,6 +1,6 @@
 import { db } from '../services/firebase.js';
 import { collection, doc, getDoc, getDocs, query, where, orderBy, limit, startAfter, addDoc, updateDoc, deleteDoc, serverTimestamp, getCountFromServer } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
-import { writeAdminLog } from './adminLogRepository.js';
+import { writeAdminLog } from '../services/firebase/adminLogRepository.js';
 
 const PAGE_SIZE=24,MAX_PAGE_SIZE=50,MAX_ID=128,MAX_TITLE=200,MAX_DESC=5000,MAX_ARRAY=100;
 const normalize=v=>String(v??'').trim(); const clamp=v=>Math.min(Math.max(Number(v)||PAGE_SIZE,1),MAX_PAGE_SIZE);
