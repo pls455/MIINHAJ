@@ -3,15 +3,25 @@ import { collection, doc, getDoc, getDocs, limit, query, where } from 'https://w
 
 const MAX_TESTS = 30;
 const MAX_QUESTIONS = 100;
+const TYPES = new Set(['mcq','true_false','multi_select']);
 
 function cleanQuestion(q, index) {
-  const type = q?.type === 'true_false' ? 'true_false' : 'mcq';
+  const type = TYPES.has(q?.type) ? q.type : 'mcq';
   const options = Array.isArray(q?.options) ? q.options.map(v => String(v ?? '').trim()).filter(Boolean).slice(0, 6) : [];
-  const answer = String(q?.answer ?? '').trim();
-  if (!q?.question || !answer) throw new Error(`TEST_QUESTION_${index + 1}_INVALID`);
-  if (type === 'mcq' && options.length < 2) throw new Error(`TEST_QUESTION_${index + 1}_OPTIONS_REQUIRED`);
-  if (type === 'mcq' && !options.includes(answer)) throw new Error(`TEST_QUESTION_${index + 1}_ANSWER_INVALID`);
-  if (type === 'true_false' && !['true','false','صح','خطأ'].includes(answer.toLowerCase())) throw new Error(`TEST_QUESTION_${index + 1}_ANSWER_INVALID`);
+  const rawAnswer = q?.answer;
+  if (!q?.question) throw new Error(`TEST_QUESTION_${index + 1}_INVALID`);
+  if (!options.length) throw new Error(`TEST_QUESTION_${index + 1}_OPTIONS_REQUIRED`);
+  let answer;
+  if (type === 'multi_select') {
+    answer = Array.isArray(rawAnswer) ? [...new Set(rawAnswer.map(v => String(v ?? '').trim()).filter(Boolean))] : [];
+    if (!answer.length || answer.some(v => !options.includes(v))) throw new Error(`TEST_QUESTION_${index + 1}_ANSWER_INVALID`);
+  } else {
+    answer = String(rawAnswer ?? '').trim();
+    if (!answer) throw new Error(`TEST_QUESTION_${index + 1}_INVALID`);
+    if (type === 'true_false' && !['true','false','صح','خطأ'].includes(answer.toLowerCase())) throw new Error(`TEST_QUESTION_${index + 1}_ANSWER_INVALID`);
+    if (type === 'mcq' && options.length < 2) throw new Error(`TEST_QUESTION_${index + 1}_OPTIONS_REQUIRED`);
+    if (type === 'mcq' && !options.includes(answer)) throw new Error(`TEST_QUESTION_${index + 1}_ANSWER_INVALID`);
+  }
   return { id: String(q.id || `q${index + 1}`), question: String(q.question).trim(), type, options, answer, explanation: String(q.explanation ?? '').trim().slice(0, 2000), points: Math.max(1, Math.min(100, Number(q.points) || 1)) };
 }
 
