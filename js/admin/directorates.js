@@ -1,4 +1,4 @@
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, limit } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
 import { db } from '../services/firebase.js';
 import { requireAdmin, ROLES } from '../services/firebase/adminCore.js';
 import { renderNavbar, renderFooter } from '../components/layout.js';
@@ -43,8 +43,8 @@ function render(){
 }
 async function remove(item){
   if(!confirm(`حذف مديرية «${item.name||''}»؟`))return;
-  const schools=await getDocs(collection(db,'schools'));
-  if(schools.docs.some(d=>d.data().directorateId===item.id)){alert(errorText({message:'DIRECTORATE_HAS_SCHOOLS'}));return;}
+  const schools=await getDocs(query(collection(db,'schools'),where('directorateId','==',item.id),limit(1)));
+  if(!schools.empty){alert(errorText({message:'DIRECTORATE_HAS_SCHOOLS'}));return;}
   try{await deleteDoc(doc(db,'directorates',item.id));try{await writeAdminLog({action:'delete',collectionName:'directorates',targetId:item.id,details:{name:item.name}})}catch(e){console.warn('[directorates.log]',e)}await load();}
   catch(e){console.error('[directorates.delete]',e);alert(errorText(e));}
 }
