@@ -6,5 +6,14 @@ compatibility_date = "2026-08-29"
 GEMINI_MODEL = "gemini-3.6-flash"
 ALLOWED_ORIGINS = "https://pls455.github.io"
 
+# Cloudflare Rate Limiting API: 20 AI requests per minute per key.
+[[ratelimits]]
+name = "AI_RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 20
+  period = 60
+
 # Set the secret separately:
 # wrangler secret put GEMINI_API_KEY
