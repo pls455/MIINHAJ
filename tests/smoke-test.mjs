@@ -9,7 +9,7 @@ const required = [
   'js/repositories/resourceRepository.js','js/repositories/solutionRepository.js',
   'js/repositories/foundationRepository.js','js/repositories/testRepository.js','js/repositories/studentTestRepository.js','js/services/ai/aiService.js',
   'worker/src/index.js','worker/wrangler.toml',
-  'admin/index.html','admin/dashboard.html','admin/problem-reports.html','admin/suggestions.html','admin/directorates.html','admin/schools.html','admin/templates.html','admin/tests.html','js/admin/tests.js','js/admin/templates.js','js/pages/tests.js','js/pages/my-tests.js','js/pages/shared-tests.js'
+  'admin/index.html','admin/dashboard.html','admin/problem-reports.html','admin/suggestions.html','admin/directorates.html','admin/schools.html','admin/templates.html','admin/tests.html','js/admin/tests.js','js/admin/templates.js','js/pages/tests.js','js/pages/my-tests-v2.js','js/pages/shared-tests.js'
 ];
 const htmlFiles = [], jsFiles = [], failures = [];
 function walk(dir, matcher, output) { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { if (['.git','node_modules'].includes(entry.name)) continue; const full = path.join(dir, entry.name); if (entry.isDirectory()) walk(full, matcher, output); else if (matcher(entry.name)) output.push(full); } }
