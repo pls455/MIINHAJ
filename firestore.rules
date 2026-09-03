@@ -26,7 +26,7 @@ service cloud.firestore {
     match /solutions/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /flashcards/{id} { allow read: if contentAdmin() || resource.data.active == true; allow write: if contentAdmin(); }
     match /studentFlashcardSets/{setId} { allow read, update, delete: if signedIn() && resource.data.ownerId == request.auth.uid; allow create: if signedIn() && validSet(); match /cards/{cardId} { allow read, update, delete: if signedIn() && get(/databases/$(database)/documents/studentFlashcardSets/$(setId)).data.ownerId == request.auth.uid; allow create: if signedIn() && get(/databases/$(database)/documents/studentFlashcardSets/$(setId)).data.ownerId == request.auth.uid && validStudentCard(); } }
-    match /studentFlashcardShares/{setId} { allow read: if true; allow create, update: if signedIn() && request.resource.data.ownerId == request.auth.uid; allow delete: if signedIn() && resource.data.ownerId == request.auth.uid; }
+    match /studentFlashcardShares/{setId} { allow read: if true; allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid; allow update: if signedIn() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId; allow delete: if signedIn() && resource.data.ownerId == request.auth.uid; }
     match /curriculumUnits/{id} { allow read: if true; allow write: if contentAdmin(); }
     match /templates/{id} { allow read: if contentAdmin(); allow create, update, delete: if contentAdmin(); }
     match /sourceRegistry/{id} { allow read: if reviewer(); allow create, update, delete: if reviewer(); }
@@ -34,7 +34,7 @@ service cloud.firestore {
     match /problemReports/{id} { allow create: if signedIn() && request.resource.data.keys().hasOnly(['sourceId','sourceTitle','kind','description','status','createdAt']) && request.resource.data.description is string && request.resource.data.description.size() > 0 && request.resource.data.description.size() <= 2000 && request.resource.data.kind is string && request.resource.data.status == 'open' && request.resource.data.createdAt is timestamp; allow read, update, delete: if reviewer(); }
     match /directorates/{id} { allow read: if true; allow create, update: if contentAdmin() && validDirectorate(); allow delete: if contentAdmin(); }
     match /schools/{id} { allow read: if true; allow create, update: if contentAdmin() && validSchool(); allow delete: if contentAdmin(); }
-    match /adminLogs/{id} { allow read: if superAdmin(); allow create: if activeAdmin() && request.resource.data.adminUid == request.auth.uid && request.resource.data.role in ['reviewer','content_admin','super_admin','superadmin','admin']; allow update, delete: if false; }
+    match /adminLogs/{id} { allow read: if superAdmin(); allow create: if activeAdmin() && request.resource.data.adminUid == request.auth.uid && request.resource.data.role == role(); allow update, delete: if false; }
     match /{document=**} { allow read, write: if false; }
   }
 }
