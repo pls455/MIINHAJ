@@ -3,13 +3,13 @@ import path from 'node:path';
 
 const root = process.cwd();
 const required = [
-  'index.html','firebase.json','firestore.rules','firestore.indexes.json','README.md',
+  'index.html','firebase.json','firestore.rules','firestore.indexes.json','README.md','tests.html',
   'css/variables.css','js/services/firebase.js','js/services/firebase/auth.js',
   'js/services/firebase/adminCore.js','js/services/firebase/permissions.js',
   'js/repositories/resourceRepository.js','js/repositories/solutionRepository.js',
-  'js/repositories/foundationRepository.js','js/services/ai/aiService.js',
+  'js/repositories/foundationRepository.js','js/repositories/testRepository.js','js/services/ai/aiService.js',
   'worker/src/index.js','worker/wrangler.toml',
-  'admin/index.html','admin/dashboard.html','admin/students.html','admin/problem-reports.html','admin/suggestions.html','admin/directorates.html','admin/schools.html','js/admin/students.js','js/admin/directorates.js','js/admin/schools.js'
+  'admin/index.html','admin/dashboard.html','admin/students.html','admin/problem-reports.html','admin/suggestions.html','admin/directorates.html','admin/schools.html','admin/templates.html','js/admin/students.js','js/admin/directorates.js','js/admin/schools.js','js/admin/templates.js','js/pages/tests.js'
 ];
 const htmlFiles = [], jsFiles = [], failures = [];
 function walk(dir, matcher, output) {
@@ -58,6 +58,7 @@ try {
   if (!/match \/users\/\{uid\}[\s\S]*allow list: if superAdmin\(\);/.test(rules)) failures.push('Student registry is not protected by superAdmin list access');
   if (!rules.includes('match /directorates/{id}')) failures.push('Directorates collection is missing from Firestore rules');
   if (!rules.includes('match /schools/{id}')) failures.push('Schools collection is missing from Firestore rules');
+  if (!rules.includes('match /tests/{id}')) failures.push('Tests collection is missing from Firestore rules');
 } catch (error) { failures.push(`firestore.rules unreadable: ${error.message}`); }
 try {
   const constants = fs.readFileSync(path.join(root, 'js/core/constants.js'), 'utf8');
