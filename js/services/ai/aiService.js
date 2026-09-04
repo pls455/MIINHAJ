@@ -25,7 +25,10 @@ async function request(action, payload = {}) {
 }
 
 export const askStudyQuestion = (question, context = '') => request('ask', { question, context });
-export const searchResourcesWithAI = (question, resources = []) => request('ask', { question, context: resources });
+export const searchResourcesWithAI = (question, resources = []) => request('resource_search', {
+  question,
+  resources: JSON.stringify(Array.isArray(resources) ? resources : [])
+});
 export const classifyResource = (input) => request('classify', input);
 export const generateQuestions = (input) => request('generate_questions', input);
 export const assessLevel = (input) => request('assess_level', input);
