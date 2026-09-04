@@ -1,12 +1,11 @@
-import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js';
-import { collection, getDoc, getDocs, query, orderBy, limit, startAfter, where, countFromServer, doc } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+import { auth, db } from '../services/firebase.js';
+import { requireAuthenticatedAdmin, signOutUser } from '../services/firebase/auth.js';
+import { collection, getDocs, query, orderBy, limit, startAfter, where, countFromServer } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
 
 const content = document.getElementById('studentsContent');
 const identity = document.getElementById('adminIdentity');
 const logoutButton = document.getElementById('logoutButton');
 const PAGE_SIZE = 50;
-let auth;
-let db;
 let students = [];
 let lastDoc = null;
 let hasMore = true;
@@ -20,7 +19,6 @@ const dateValue = value => value?.toDate ? value.toDate() : value ? new Date(val
 const dateText = value => { const d=dateValue(value); return d && !Number.isNaN(d.getTime()) ? d.toLocaleString('ar-EG',{dateStyle:'medium',timeStyle:'short'}) : 'غير متوفر'; };
 
 function setStatus(text, type='loading') { if (content) content.innerHTML = `<div class="${type === 'error' ? 'error-box' : 'loading'}" role="status">${esc(text)}</div>`; }
-function normalizeRole(role) { const value=String(role||'').trim().toLowerCase(); if(['superadmin','super_admin','admin','super-admin','مدير النظام','المدير العام'].includes(value)) return 'super_admin'; if(['contentadmin','content_admin','content-admin','مدير المحتوى'].includes(value)) return 'content_admin'; if(['reviewer','مراجع','مراجع المصادر'].includes(value)) return 'reviewer'; return value; }
 function filteredStudents() { const term=(document.getElementById('studentSearch')?.value||'').trim().toLowerCase(); return term ? students.filter(s=>[s.name,s.email,s.identityNumber,s.id].some(v=>String(v||'').toLowerCase().includes(term))) : students; }
 
 function render() {
@@ -35,8 +33,28 @@ function exportCsv() { const headers=['uid','name','email','identityNumber','rol
 async function safeCounts() { const users=collection(db,'users'); const start=new Date(); start.setHours(0,0,0,0); const results=await Promise.allSettled([countFromServer(users),countFromServer(query(users,where('createdAt','>=',start))),countFromServer(query(users,where('identityNumber','!=','')))]); if(results[0].status==='fulfilled')totalCount=results[0].value.data().count; if(results[1].status==='fulfilled')todayCount=results[1].value.data().count; if(results[2].status==='fulfilled')identityCount=results[2].value.data().count; }
 async function fetchPage(after=null) { const users=collection(db,'users'); try { const constraints=[orderBy('createdAt','desc')]; if(after)constraints.push(startAfter(after)); constraints.push(limit(PAGE_SIZE)); const snap=await getDocs(query(users,...constraints)); lastDoc=snap.docs.at(-1)||lastDoc; hasMore=snap.docs.length===PAGE_SIZE; return snap.docs.map(d=>({id:d.id,...d.data()})); } catch(error) { if(error?.code!=='failed-precondition')throw error; const snap=await getDocs(query(users,limit(PAGE_SIZE))); lastDoc=null; hasMore=false; return snap.docs.map(d=>({id:d.id,...d.data()})); } }
 async function loadMore() { if(loadingMore||!hasMore)return; loadingMore=true; const button=document.getElementById('loadMoreStudents'); if(button){button.disabled=true;button.textContent='جارٍ التحميل...';} try { const next=await fetchPage(lastDoc); const existing=new Set(students.map(s=>s.id)); students.push(...next.filter(s=>!existing.has(s.id))); render(); } catch(error) { console.error('[admin-students] load more',error); if(button){button.disabled=false;button.textContent='تعذر التحميل، أعد المحاولة';} } finally { loadingMore=false; } }
-function waitForAuth(timeoutMs=12000) { if(auth.currentUser)return Promise.resolve(auth.currentUser); return new Promise((resolve,reject)=>{ let done=false; let unsubscribe=()=>{}; const finish=(fn,value)=>{if(done)return;done=true;clearTimeout(timer);unsubscribe();fn(value);}; const timer=setTimeout(()=>{const e=new Error('AUTH_TIMEOUT');e.code='AUTH_TIMEOUT';finish(reject,e);},timeoutMs); unsubscribe=onAuthStateChanged(auth,user=>finish(resolve,user),error=>finish(reject,error)); }); }
-logoutButton?.addEventListener('click',async()=>{try{if(auth)await signOut(auth);}finally{location.href='index.html';}});
-async function getAdmin(user) { const snapshot=await getDoc(doc(db,'admins',user.uid)); if(!snapshot.exists())throw Object.assign(new Error('ADMIN_ACCESS_REQUIRED'),{code:'ADMIN_ACCESS_REQUIRED'}); const admin={uid:snapshot.id,...snapshot.data()}; if(admin.active===false)throw Object.assign(new Error('ADMIN_ACCESS_REQUIRED'),{code:'ADMIN_ACCESS_REQUIRED'}); if(normalizeRole(admin.role)!=='super_admin')throw Object.assign(new Error('INSUFFICIENT_PERMISSIONS'),{code:'INSUFFICIENT_PERMISSIONS'}); return admin; }
-async function boot() { try { setStatus('جارٍ تهيئة صفحة الطلاب...'); const firebase=await import('../services/firebase.js'); auth=firebase.auth; db=firebase.db; const user=await waitForAuth(); if(!user)throw Object.assign(new Error('AUTH_REQUIRED'),{code:'AUTH_REQUIRED'}); setStatus('تم التحقق من الحساب، جارٍ تحميل بيانات الطلاب...'); const admin=await getAdmin(user); identity.textContent=`${user.email||admin.email||'حساب الإدارة'} • Super Admin`; students=await fetchPage(); render(); safeCounts().then(render).catch(error=>console.warn('[admin-students] counts',error)); } catch(error) { console.error('[admin-students] boot',error); const code=error?.code||error?.message||'UNKNOWN_ERROR'; const authError=['AUTH_REQUIRED','ADMIN_ACCESS_REQUIRED','INSUFFICIENT_PERMISSIONS'].includes(code); const title=code==='AUTH_TIMEOUT'?'تعذر التحقق من جلسة الدخول':authError?'لا تملك صلاحية الوصول':'تعذر تحميل سجل الطلاب'; const message=code==='AUTH_TIMEOUT'?'انتهت مهلة انتظار Firebase. أعد تحميل الصفحة بعد التأكد من تسجيل الدخول.':authError?'هذه الصفحة متاحة لـ Super Admin فقط.':'حدث خطأ أثناء تحميل بيانات الطلاب. تم إيقاف شاشة التحميل بدل تركها معلقة.'; content.innerHTML=`<div class="error-box" role="alert"><h2>${esc(title)}</h2><p>${esc(message)}</p><p class="muted">رمز الخطأ: ${esc(code)}</p><button id="retryStudents" class="button" type="button">إعادة المحاولة</button></div>`; document.getElementById('retryStudents')?.addEventListener('click',()=>location.reload()); } }
+logoutButton?.addEventListener('click',async()=>{try{await signOutUser();}finally{location.href='index.html';}});
+
+async function boot() {
+  try {
+    setStatus('جارٍ تهيئة صفحة الطلاب...');
+    const { user, admin } = await requireAuthenticatedAdmin();
+    if (!admin || admin.active === false) throw Object.assign(new Error('ADMIN_ACCESS_REQUIRED'),{code:'ADMIN_ACCESS_REQUIRED'});
+    const role=String(admin.role||'').trim().toLowerCase().replace(/[- ]/g,'_');
+    if (!['super_admin','superadmin','admin'].includes(role)) throw Object.assign(new Error('INSUFFICIENT_PERMISSIONS'),{code:'INSUFFICIENT_PERMISSIONS'});
+    identity.textContent=`${user.email||admin.email||'حساب الإدارة'} • Super Admin`;
+    setStatus('تم التحقق من الحساب، جارٍ تحميل بيانات الطلاب...');
+    students=await fetchPage();
+    render();
+    safeCounts().then(render).catch(error=>console.warn('[admin-students] counts',error));
+  } catch(error) {
+    console.error('[admin-students] boot',error);
+    const code=error?.code||error?.message||'UNKNOWN_ERROR';
+    const title=code==='AUTH_TIMEOUT'?'تعذر التحقق من جلسة الدخول':['AUTH_REQUIRED','ADMIN_ACCESS_REQUIRED','INSUFFICIENT_PERMISSIONS'].includes(code)?'لا تملك صلاحية الوصول':'تعذر تحميل سجل الطلاب';
+    const message=code==='AUTH_TIMEOUT'?'انتهت مهلة انتظار Firebase. أعد تحميل الصفحة بعد التأكد من تسجيل الدخول.':['AUTH_REQUIRED','ADMIN_ACCESS_REQUIRED','INSUFFICIENT_PERMISSIONS'].includes(code)?'هذه الصفحة متاحة لـ Super Admin فقط.':'حدث خطأ أثناء تحميل بيانات الطلاب. تم إيقاف شاشة التحميل بدل تركها معلقة.';
+    content.innerHTML=`<div class="error-box" role="alert"><h2>${esc(title)}</h2><p>${esc(message)}</p><p class="muted">رمز الخطأ: ${esc(code)}</p><button id="retryStudents" class="button" type="button">إعادة المحاولة</button></div>`;
+    document.getElementById('retryStudents')?.addEventListener('click',()=>location.reload());
+  }
+}
+
 boot();
