@@ -1,4 +1,4 @@
-import { requireAuthenticatedAdmin } from './auth-v2.js';
+import { requireAuthenticatedAdmin } from './auth.js';
 import { ROLES, ROLE_LEVELS } from '../../core/constants.js';
 
 function normalizeRole(role) {
