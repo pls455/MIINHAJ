@@ -1,4 +1,58 @@
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
-:root{--bg:#070a13;--panel:rgba(17,23,40,.72);--text:#f5f7ff;--muted:#9ca7bf;--border:rgba(255,255,255,.09);--purple:#7c5cff;--cyan:#19c7d9;--color-primary:#7c5cff;--color-primary-hover:#19c7d9;--color-secondary:#19c7d9;--color-background:#070a13;--color-surface:rgba(17,23,40,.72);--color-surface-solid:#101629;--color-text:#f5f7ff;--color-muted:#9ca7bf;--color-border:rgba(255,255,255,.09);--color-danger:#ff6b7a;--color-success:#25d366;--radius-sm:12px;--radius-md:20px;--radius-lg:24px;--shadow-sm:0 8px 24px rgba(0,0,0,.12);--shadow-md:0 18px 45px rgba(0,0,0,.24);--content-width:1180px;--font-family:Cairo,"Segoe UI",Arial,sans-serif}
-[data-theme="light"]{--bg:#f5f7fb;--panel:rgba(255,255,255,.86);--text:#151a2b;--muted:#667085;--border:rgba(20,28,50,.10);--color-background:#f5f7fb;--color-surface:rgba(255,255,255,.86);--color-surface-solid:#fff;--color-text:#151a2b;--color-muted:#667085;--color-border:rgba(20,28,50,.10)}
-[data-theme="dark"]{--color-background:var(--bg);--color-surface:var(--panel);--color-text:var(--text);--color-muted:var(--muted);--color-border:var(--border)}
+
+:root {
+  --bg: #080b14;
+  --panel: rgba(18, 24, 42, 0.82);
+  --text: #f7f8fc;
+  --muted: #9aa5bd;
+  --border: rgba(255, 255, 255, 0.09);
+  --purple: #7c5cff;
+  --cyan: #20c9d8;
+
+  --color-primary: #7c5cff;
+  --color-primary-hover: #6d4ff0;
+  --color-secondary: #20c9d8;
+  --color-background: #080b14;
+  --color-surface: rgba(18, 24, 42, 0.82);
+  --color-surface-solid: #11172a;
+  --color-text: #f7f8fc;
+  --color-muted: #9aa5bd;
+  --color-border: rgba(255, 255, 255, 0.09);
+  --color-danger: #ff6878;
+  --color-success: #35d07f;
+  --color-warning: #f5b84b;
+
+  --radius-sm: 10px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 30px;
+
+  --shadow-sm: 0 8px 28px rgba(0, 0, 0, 0.16);
+  --shadow-md: 0 18px 50px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.34);
+
+  --content-width: 1180px;
+  --font-family: Cairo, "Segoe UI", Arial, sans-serif;
+}
+
+[data-theme="light"] {
+  --bg: #f4f6fb;
+  --panel: rgba(255, 255, 255, 0.88);
+  --text: #151a2b;
+  --muted: #667085;
+  --border: rgba(20, 28, 50, 0.10);
+  --color-background: #f4f6fb;
+  --color-surface: rgba(255, 255, 255, 0.88);
+  --color-surface-solid: #ffffff;
+  --color-text: #151a2b;
+  --color-muted: #667085;
+  --color-border: rgba(20, 28, 50, 0.10);
+}
+
+[data-theme="dark"] {
+  --color-background: var(--bg);
+  --color-surface: var(--panel);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+}
