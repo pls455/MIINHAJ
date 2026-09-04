@@ -1,4 +1,4 @@
-import { doc, getDoc, getDocs, collection, query, where, limit, serverTimestamp, setDoc } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+import { doc, getDoc, getDocs, collection, query, where, limit, serverTimestamp, setDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
 import { db, auth } from '../services/firebase.js';
 import { getStudentProfile } from '../services/studentAuth.js';
 
@@ -78,10 +78,39 @@ export async function getAdminApplications({ status = null, pageSize = 50 } = {}
   constraints.push(limit(Math.min(Math.max(Number(pageSize) || 50, 1), 100)));
   const snap = await getDocs(query(collection(db, NAME), ...constraints));
   const items = snap.docs.map(item => ({ id: item.id, ...item.data() }));
-  items.sort((a, b) => {
-    const at = a.createdAt?.toMillis?.() || 0;
-    const bt = b.createdAt?.toMillis?.() || 0;
-    return bt - at;
-  });
+  items.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
   return items;
+}
+
+export async function reviewAdminApplication(uid, status, role, note = '') {
+  const normalizedStatus = clean(status);
+  const normalizedRole = clean(role);
+  if (!uid || !['approved', 'rejected'].includes(normalizedStatus)) throw Error('ADMIN_APPLICATION_REVIEW_INVALID');
+  if (normalizedStatus === 'approved' && !['reviewer', 'content_admin', 'super_admin'].includes(normalizedRole)) throw Error('ADMIN_APPLICATION_ROLE_INVALID');
+  const reviewer = auth.currentUser;
+  if (!reviewer) throw Error('STUDENT_LOGIN_REQUIRED');
+  const applicationRef = doc(db, NAME, uid);
+  const application = await getDoc(applicationRef);
+  if (!application.exists()) throw Error('ADMIN_APPLICATION_NOT_FOUND');
+  const data = application.data();
+  if (data.status !== 'pending') throw Error('ADMIN_APPLICATION_NOT_PENDING');
+  const now = serverTimestamp();
+  await updateDoc(applicationRef, {
+    status: normalizedStatus,
+    reviewerUid: reviewer.uid,
+    reviewerEmail: reviewer.email || '',
+    reviewerNote: clean(note).slice(0, 1000) || null,
+    reviewedAt: now,
+    updatedAt: now
+  });
+  if (normalizedStatus === 'approved') {
+    await setDoc(doc(db, 'admins', uid), {
+      email: data.studentEmail || '',
+      name: data.studentName || '',
+      role: normalizedRole,
+      active: true,
+      createdAt: now,
+      updatedAt: now
+    }, { merge: true });
+  }
 }
