@@ -6,26 +6,8 @@ await requireAdmin(ROLES.REVIEWER);
 renderNavbar(); renderFooter();
 const $ = id => document.getElementById(id);
 let cursor = null, busy = false;
-
-function state(text, error = false) { const el=document.createElement('div'); el.className=error?'message error':'message'; el.textContent=text; el.setAttribute('role',error?'alert':'status'); return el; }
-function render(items) {
-  const root=$('suggestions-list'); root.replaceChildren();
-  if(!items.length){ const e=document.createElement('div'); e.className='empty'; e.textContent='لا توجد اقتراحات بهذه الحالة.'; e.setAttribute('role','status'); root.append(e); return; }
-  for(const item of items){
-    const card=document.createElement('article'); card.className='card admin-row';
-    const info=document.createElement('div');
-    const h=document.createElement('h3'); h.textContent=item.title||'بدون عنوان';
-    const meta=document.createElement('p'); meta.textContent=[item.contentType,item.branchId,item.subjectId].filter(Boolean).join(' • ');
-    const desc=document.createElement('p'); desc.textContent=item.description||'';
-    info.append(h,meta,desc);
-    if(/^https?:\/\//i.test(item.url||'')){ const link=document.createElement('a'); link.href=item.url; link.target='_blank'; link.rel='noopener noreferrer'; link.textContent='فتح الرابط'; info.append(link); }
-    const status=document.createElement('small'); status.textContent=`الحالة: ${item.status||'pending'}`; info.append(status);
-    const actions=document.createElement('div'); actions.className='actions';
-    for(const [value,label] of [['approved','قبول'],['rejected','رفض'],['archived','أرشفة']]){ const b=document.createElement('button'); b.className=`button ${value==='approved'?'primary':''}`; b.type='button'; b.textContent=label; b.addEventListener('click',()=>change(item,value)); actions.append(b); }
-    card.append(info,actions); root.append(card);
-  }
-}
-async function change(item,status){ if(busy||!confirm(`تأكيد تغيير حالة الاقتراح إلى «${status}»؟`))return; busy=true; try{await updateSuggestionStatus(item.id,status);cursor=null;await load()}catch(error){console.error('[admin/suggestions.status]',error);alert('تعذر تحديث حالة الاقتراح.')}finally{busy=false} }
-async function load(){ const status=$('status'); status.replaceChildren(state('جاري التحميل...')); try{const r=await getSuggestions({pageSize:24,cursor,status:$('filter').value||null});render(r.items);const p=$('pagination');p.replaceChildren();if(r.nextCursor){const b=document.createElement('button');b.className='button';b.type='button';b.textContent='التالي';b.addEventListener('click',()=>{cursor=r.nextCursor;load()});p.append(b)}status.replaceChildren()}catch(error){console.error('[admin/suggestions.load]',error);status.replaceChildren(state('تعذر تحميل الاقتراحات.',true))}}
-$('filter').addEventListener('change',()=>{cursor=null;load()});
-load();
+function state(text, error=false){const el=document.createElement('div');el.className=error?'message error':'message';el.textContent=text;el.setAttribute('role',error?'alert':'status');return el;}
+function render(items){const root=$('suggestions-list');root.replaceChildren();if(!items.length){root.append(state('لا توجد اقتراحات بهذه الحالة.'));return;}for(const item of items){const card=document.createElement('article');card.className='card admin-row';const info=document.createElement('div');const h=document.createElement('h3');h.textContent=item.title||'بدون عنوان';const meta=document.createElement('p');meta.textContent=[item.contentType,item.branchId,item.subjectId,item.studentEmail?`الطالب: ${item.studentEmail}`:'اقتراح غير مرتبط بحساب'].filter(Boolean).join(' • ');const desc=document.createElement('p');desc.textContent=item.description||'';info.append(h,meta,desc);if(/^https?:\/\//i.test(item.url||'')){const link=document.createElement('a');link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='فتح الرابط';info.append(link);}const status=document.createElement('small');status.textContent=`الحالة: ${item.status||'pending'}`;info.append(status);const actions=document.createElement('div');actions.className='actions';for(const [value,label] of [['approved','قبول'],['rejected','رفض'],['archived','أرشفة']]){const b=document.createElement('button');b.className=`button ${value==='approved'?'primary':''}`;b.type='button';b.textContent=label;b.addEventListener('click',()=>change(item,value));actions.append(b);}card.append(info,actions);root.append(card);}}
+async function change(item,status){if(busy||!confirm(`تأكيد تغيير حالة الاقتراح إلى «${status}»؟`))return;busy=true;try{await updateSuggestionStatus(item.id,status);cursor=null;await load()}catch(error){console.error('[admin/suggestions.status]',error);alert('تعذر تحديث حالة الاقتراح.')}finally{busy=false}}
+async function load(){const status=$('status');status.replaceChildren(state('جاري التحميل...'));try{const r=await getSuggestions({pageSize:24,cursor,status:$('filter').value||null});render(r.items);const p=$('pagination');p.replaceChildren();if(r.nextCursor){const b=document.createElement('button');b.className='button';b.type='button';b.textContent='التالي';b.addEventListener('click',()=>{cursor=r.nextCursor;load()});p.append(b)}status.replaceChildren()}catch(error){console.error('[admin/suggestions.load]',error);status.replaceChildren(state('تعذر تحميل الاقتراحات.',true))}}
+$('filter').addEventListener('change',()=>{cursor=null;load()});load();
