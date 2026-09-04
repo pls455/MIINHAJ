@@ -6,6 +6,8 @@ import {
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
 import { auth, db } from "../firebase.js";
 
+const AUTH_WAIT_TIMEOUT_MS = 10000;
+
 export function observeAuth(callback) {
   return onAuthStateChanged(auth, callback);
 }
@@ -36,13 +38,25 @@ export async function requireAuthenticatedAdmin() {
 
 function waitForAuthUser() {
   if (auth.currentUser) return Promise.resolve(auth.currentUser);
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     let settled = false;
-    const unsubscribe = onAuthStateChanged(auth, user => {
+    let timer;
+    const finish = (callback, value) => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
       unsubscribe();
-      resolve(user);
-    });
+      callback(value);
+    };
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      user => finish(resolve, user),
+      error => finish(reject, error)
+    );
+    timer = setTimeout(() => {
+      const error = new Error("AUTH_TIMEOUT");
+      error.code = "AUTH_TIMEOUT";
+      finish(reject, error);
+    }, AUTH_WAIT_TIMEOUT_MS);
   });
 }
