@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>الطلاب المسجلون | مِنهَاج</title>
   <link rel="icon" href="../assets/logo.svg">
   <link rel="stylesheet" href="../css/variables.css">
@@ -25,6 +28,21 @@
       <div class="loading">جارٍ تحميل بيانات الطلاب...</div>
     </section>
   </main>
-  <script type="module" src="../js/admin/students.js?v=20260904-5"></script>
+  <script type="module">
+    const content = document.getElementById('studentsContent');
+    const identity = document.getElementById('adminIdentity');
+    const escapeHtml = value => String(value ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
+    const showBootError = message => {
+      if (identity) identity.textContent = 'تعذر تشغيل صفحة الطلاب';
+      if (content) content.innerHTML = `<div class="error-box" role="alert"><h2>تعذر تشغيل صفحة الطلاب</h2><p>${escapeHtml(message || 'تعذر تحميل ملف صفحة الطلاب.')}</p><button id="retryStudentsPage" class="button" type="button">إعادة المحاولة</button></div>`;
+      document.getElementById('retryStudentsPage')?.addEventListener('click', () => location.reload());
+    };
+    try {
+      await import('../js/admin/students.js?v=20260904-6');
+    } catch (error) {
+      console.error('[students-page] import failed', error);
+      showBootError(error?.message || 'تعذر تحميل ملف صفحة الطلاب.');
+    }
+  </script>
 </body>
 </html>
