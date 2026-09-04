@@ -2,7 +2,7 @@ import { mountShell } from '../components/layout.js';
 import { askStudyQuestion, searchResourcesWithAI } from '../services/ai/aiService.js';
 import { resourceRepository } from '../repositories/resourceRepository.js';
 import { auth, db } from '../services/firebase.js';
-import { doc, runTransaction, Timestamp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
+import { doc, runTransaction, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js';
 
 const AI_LIMIT = 3;
 const AI_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
@@ -18,14 +18,12 @@ async function reserveStudentAiQuestion() {
     const started = data?.windowStartedAt?.toMillis?.() || 0;
     const expired = !started || now - started >= AI_WINDOW_MS;
     const used = expired ? 0 : Number(data?.count || 0);
-    if (used >= AI_LIMIT) {
-      return { allowed: false, used, remaining: 0, resetAt: started + AI_WINDOW_MS };
-    }
+    if (used >= AI_LIMIT) return { allowed: false, used, remaining: 0, resetAt: started + AI_WINDOW_MS };
     const next = used + 1;
     transaction.set(ref, {
       count: next,
-      windowStartedAt: expired ? Timestamp.fromMillis(now) : data.windowStartedAt,
-      updatedAt: Timestamp.fromMillis(now)
+      windowStartedAt: expired ? serverTimestamp() : data.windowStartedAt,
+      updatedAt: serverTimestamp()
     });
     return { allowed: true, used: next, remaining: AI_LIMIT - next, resetAt: (expired ? now : started) + AI_WINDOW_MS };
   });
@@ -54,8 +52,7 @@ document.getElementById('chat').addEventListener('submit', async e => {
   const input = document.getElementById('q');
   const q = input.value.trim();
   if (!q) return;
-  const user = auth.currentUser;
-  if (!user) { add('سجّل الدخول أولًا لاستخدام مساعد منهاج.', 'bot'); return; }
+  if (!auth.currentUser) { add('سجّل الدخول أولًا لاستخدام مساعد منهاج.', 'bot'); return; }
   input.value = '';
   add(q, 'user');
   const wait = add('جارٍ البحث...');
